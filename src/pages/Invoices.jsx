@@ -5,11 +5,13 @@ import { formatCurrency } from '../utils/helpers'
 import jsPDF from 'jspdf'
 
 export default function InvoicesPage(){
-  const { data, addInvoice, updateInvoice, deleteInvoice } = useData()
+  const { data, addInvoice, updateInvoice, deleteInvoice, addClient } = useData()
   const [form,setForm]=useState({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', line_items:[{description:'', quantity:1, rate:0}]})
   const [editing,setEditing]=useState(null)
   const [err,setErr]=useState('')
   const [info,setInfo]=useState('')
+  const [newClientName,setNewClientName]=useState('')
+  const [showNewClient,setShowNewClient]=useState(false)
 
   const total = useMemo(()=> form.line_items.reduce((s,l)=> s + (Number(l.quantity)||0)*(Number(l.rate)||0),0), [form.line_items])
   const addLine=()=> setForm({...form, line_items:[...form.line_items,{description:'',quantity:1,rate:0}]})
@@ -19,7 +21,7 @@ export default function InvoicesPage(){
   const submit=async(e)=>{
     e.preventDefault()
     setErr(''); setInfo('')
-    if(!form.client_id){ setErr('Client is required'); return }
+    if(!form.client_id){ setErr('Client is required — select one or click ＋ to add a new client'); return }
     if(!form.issue_date || !form.due_date){ setErr('Issue and due dates are required'); return }
     if(new Date(form.due_date) < new Date(form.issue_date)){ setErr('Due date cannot be before issue date'); return }
     if(form.line_items.length===0){ setErr('At least one line item is required'); return }
@@ -46,6 +48,15 @@ export default function InvoicesPage(){
       setInfo(editing ? 'Invoice updated!' : `Invoice created! ${payload.invoice_number||''}`)
       setForm({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', line_items:[{description:'', quantity:1, rate:0}]}); setEditing(null)
       setTimeout(()=> setInfo(''), 3000)
+    }catch(ex){ setErr(ex.message) }
+  }
+  const handleAddClient = async()=>{
+    if(!newClientName.trim() || newClientName.trim().length <2){ setErr('Client name min 2 chars'); return }
+    try{
+      const res = await addClient({ name:newClientName.trim(), email:'', notes:'' })
+      const id = res?.id || res
+      setNewClientName(''); setShowNewClient(false); setErr('')
+      if(id) setForm(f=>({...f, client_id:id}))
     }catch(ex){ setErr(ex.message) }
   }
   const startEdit=(inv)=>{
@@ -107,8 +118,14 @@ export default function InvoicesPage(){
         <h2 className="font-semibold mb-4">{editing?'Edit invoice':'Create invoice'}</h2>
         <form onSubmit={submit} className="space-y-4">
           <div className="grid md:grid-cols-3 gap-4">
-            <div><Label>Client *</Label><Select value={form.client_id} onChange={e=>setForm({...form, client_id:e.target.value})} required><option value="">Select client</option>{data.clients.map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
-              {data.clients.length===0 && <p className="text-xs text-amber-600 mt-1">Add a client first on Clients page.</p>}
+            <div>
+              <Label>Client *</Label>
+              <div className="flex gap-2">
+                <Select value={form.client_id} onChange={e=>setForm({...form, client_id:e.target.value})}><option value="">Select client</option>{data.clients.map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
+                <Button type="button" variant="ghost" onClick={()=>setShowNewClient(v=>!v)} className="px-2.5">＋</Button>
+              </div>
+              {showNewClient && <div className="flex gap-2 mt-2"><Input placeholder="New client name (min 2 chars)" value={newClientName} onChange={e=>setNewClientName(e.target.value)} /><Button type="button" onClick={handleAddClient} className="text-xs">Add</Button></div>}
+              {data.clients.length===0 && !showNewClient && <p className="text-xs text-amber-600 mt-1">No clients yet — click ＋ to add one, or go to Clients page.</p>}
             </div>
             <div><Label>Issue date *</Label><Input type="date" value={form.issue_date} onChange={e=>setForm({...form, issue_date:e.target.value})} required /></div>
             <div><Label>Due date *</Label><Input type="date" value={form.due_date} onChange={e=>setForm({...form, due_date:e.target.value})} required /></div>

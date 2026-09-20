@@ -83,19 +83,6 @@ export default function Settings(){
         <p className="text-sm text-gray-600 mt-1">Delete your account and all associated data (clients, income, expenses, invoices, receipts). This is permanent.</p>
         <Button onClick={handleDelete} disabled={deleting} className="mt-3 bg-red-600 hover:bg-red-700 text-white">{deleting?'Deleting…':'Delete my account and all my data'}</Button>
       </Card>
-
-      <Card className="p-5">
-        <h3 className="font-semibold">Supabase setup (production)</h3>
-        <ol className="text-sm text-gray-600 list-decimal pl-5 space-y-2 mt-3">
-          <li>Create project at <a href="https://supabase.com" target="_blank" rel="noreferrer" className="text-teal-700 underline">supabase.com</a></li>
-          <li>SQL Editor → run <code className="bg-gray-100 px-1.5 py-0.5 rounded">supabase/schema.sql</code> (creates tables + RLS + storage policies + delete_current_user)</li>
-          <li>Storage → bucket <code className="bg-gray-100 px-1.5 py-0.5 rounded">receipts</code> will be created by SQL; set to public</li>
-          <li>Authentication → disable “Confirm email” for instant signup→dashboard, or leave enabled for email confirmation</li>
-          <li>Copy URL + anon key to <code className="bg-gray-100 px-1.5 py-0.5 rounded">.env</code> and to Vercel env vars as VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY</li>
-          <li>Auth → URL Configuration → add Site URL = your Vercel URL and Redirect URLs include <code>{'{VERCEL_URL}'}/update-password</code> for reset flow</li>
-        </ol>
-        <p className="text-xs text-gray-400 mt-3">RLS ensures no user can ever see another’s rows — every query is filtered by auth.uid().</p>
-      </Card>
     </div>
   )
 }

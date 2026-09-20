@@ -62,25 +62,32 @@ export function DataProvider({ children }) {
   useEffect(()=>{ refresh() }, [refresh])
 
   // CRUD helpers - work both local and supabase with proper error propagation
+  const sanitizeClient = (p) => ({
+    name: p.name?.trim(),
+    email: p.email?.trim() ? p.email.trim() : null,
+    notes: p.notes?.trim() || null,
+  })
   const addClient = async (payload) => {
     if (!payload.name?.trim()) throw new Error('Client name is required')
+    const clean = sanitizeClient(payload)
     if (useLocalMode) {
       const id = 'c'+Date.now()
-      const next = { ...data, clients: [...data.clients, { id, ...payload }] }
-      persist(next); return { id }
+      const next = { ...data, clients: [...data.clients, { id, ...clean }] }
+      persist(next); return { id, ...clean }
     }
-    const { data: res, error } = await supabase.from('clients').insert({ ...payload, user_id: user.id }).select().single()
+    const { data: res, error } = await supabase.from('clients').insert({ ...clean, user_id: user.id }).select().single()
     if (error) throw new Error(error.message)
     await refresh()
     return res
   }
   const updateClient = async (id, payload) => {
     if (!payload.name?.trim()) throw new Error('Client name is required')
+    const clean = sanitizeClient(payload)
     if (useLocalMode) {
-      const next = { ...data, clients: data.clients.map(c=> c.id===id? {...c, ...payload}:c) }
+      const next = { ...data, clients: data.clients.map(c=> c.id===id? {...c, ...clean}:c) }
       persist(next); return
     }
-    const { error } = await supabase.from('clients').update(payload).eq('id', id).eq('user_id', user.id)
+    const { error } = await supabase.from('clients').update(clean).eq('id', id).eq('user_id', user.id)
     if (error) throw new Error(error.message)
     await refresh()
   }

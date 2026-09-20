@@ -138,7 +138,7 @@ export default function InvoicesPage(){
               {form.line_items.map((l,i)=>(
                 <div key={i} className="grid grid-cols-12 gap-2 items-end bg-gray-50 border border-gray-100 rounded-xl p-3">
                   <div className="col-span-12 md:col-span-6"><Label>Description *</Label><Input value={l.description} onChange={e=>updateLine(i,{description:e.target.value})} placeholder="Web design" required minLength={2} /></div>
-                  <div className="col-span-4 md:col-span-2"><Label>Qty *</Label><Input type="number" min="0.01" step="1" value={l.quantity} onChange={e=>updateLine(i,{quantity:e.target.value})} required /></div>
+                  <div className="col-span-4 md:col-span-2"><Label>Qty *</Label><Input type="number" min="1" step="1" value={l.quantity} onChange={e=>updateLine(i,{quantity:e.target.value})} required /></div>
                   <div className="col-span-4 md:col-span-2"><Label>Rate ({data.settings.currency}) *</Label><Input type="number" min="0" step="0.01" value={l.rate} onChange={e=>updateLine(i,{rate:e.target.value})} required /></div>
                   <div className="col-span-3 md:col-span-1 text-sm font-semibold text-right">{formatCurrency((Number(l.quantity)||0)*(Number(l.rate)||0), data.settings.currency)}</div>
                   <div className="col-span-1 flex justify-end"><button type="button" onClick={()=>removeLine(i)} className="text-xs text-red-600 hover:underline" disabled={form.line_items.length===1}>✕</button></div>

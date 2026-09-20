@@ -47,10 +47,10 @@ export default function Settings(){
 
       <Card className="p-5 md:p-6">
         <form onSubmit={submit} className="space-y-4">
-          <div><Label>Your name</Label><Input value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Alex Freelancer" /></div>
-          <div><Label>Business name (shown on invoices)</Label><Input value={form.business_name||''} onChange={e=>setForm({...form,business_name:e.target.value})} placeholder="Alex Studio LLC" /></div>
-          <div><Label>Currency symbol</Label>
-            <Select value={form.currency||'$'} onChange={e=>setForm({...form,currency:e.target.value})}>
+          <div><Label htmlFor="settings-name">Your name</Label><Input id="settings-name" value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Alex Freelancer" /></div>
+          <div><Label htmlFor="settings-business">Business name (shown on invoices)</Label><Input id="settings-business" value={form.business_name||''} onChange={e=>setForm({...form,business_name:e.target.value})} placeholder="Alex Studio LLC" /></div>
+          <div><Label htmlFor="settings-currency">Currency symbol</Label>
+            <Select id="settings-currency" value={form.currency||'$'} onChange={e=>setForm({...form,currency:e.target.value})}>
               <option value="$">$ USD</option>
               <option value="€">€ EUR</option>
               <option value="£">£ GBP</option>

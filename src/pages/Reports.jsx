@@ -40,7 +40,7 @@ export default function Reports(){
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h1 className="text-2xl font-bold">Reports</h1><p className="text-sm text-gray-500">Filter by date, see breakdown, export CSV for tax season.</p></div>
-        <Button onClick={handleExport} disabled={isInvalidRange}>⬇ Export CSV</Button>
+        <Button onClick={handleExport} disabled={isInvalidRange} aria-disabled={isInvalidRange}>⬇ Export CSV</Button>
       </div>
 
       <Card className="p-5 flex flex-wrap gap-4 items-end">

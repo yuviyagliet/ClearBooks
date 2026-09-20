@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --color-accent: #0f766e;
+  --color-accent-hover: #0d5f59;
+  --color-accent-light: #ccfbf1;
+  --color-border: #e5e7eb;
+  --color-muted: #6b7280;
+  --color-bg: #f9fafb;
+}
+
+* { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+body { background: #f9fafb; color: #111827; }

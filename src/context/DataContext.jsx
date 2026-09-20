@@ -2,12 +2,13 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { supabase, useLocalMode } from '../lib/supabase'
 import { loadLocal, saveLocal } from '../utils/storage'
 import { useAuth } from './AuthContext'
+import { track } from '../lib/analytics'
 
 const DataContext = createContext(null)
 
 export function DataProvider({ children }) {
   const { user } = useAuth()
-  const [data, setData] = useState(() => useLocalMode ? loadLocal() : { clients:[], income:[], expenses:[], invoices:[], settings:{name:'', business_name:'', currency:'$'}, invoice_counter:1001 })
+  const [data, setData] = useState(() => useLocalMode ? loadLocal() : { clients:[], income:[], expenses:[], invoices:[], settings:{name:'', business_name:'', currency:'$', default_tax_rate:18}, invoice_counter:1001 })
   const [loading, setLoading] = useState(!useLocalMode)
   const [error, setError] = useState(null)
 
@@ -23,7 +24,7 @@ export function DataProvider({ children }) {
       return
     }
     if (!user) { 
-      setData({ clients:[], income:[], expenses:[], invoices:[], settings:{name:'', business_name:'', currency:'$'}, invoice_counter:1001 })
+      setData({ clients:[], income:[], expenses:[], invoices:[], settings:{name:'', business_name:'', currency:'$', default_tax_rate:18}, invoice_counter:1001 })
       setLoading(false); return 
     }
     setLoading(true)
@@ -41,14 +42,32 @@ export function DataProvider({ children }) {
       if (expenses.error) throw expenses.error
       if (invoices.error) throw invoices.error
 
-      const savedSettings = JSON.parse(localStorage.getItem('clearbooks_settings') || 'null') || { name: user.email?.split('@')[0]||'', business_name:'', currency:'$' }
+      const savedSettings = JSON.parse(localStorage.getItem('clearbooks_settings') || 'null') || { name: user.email?.split('@')[0]||'', business_name:'', currency:'$', default_tax_rate:18 }
+      if (savedSettings.default_tax_rate == null) savedSettings.default_tax_rate = 18
       const invCounter = invoices.data?.length ? Math.max(...invoices.data.map(i=> parseInt(String(i.invoice_number).replace(/\D/g,''))||1000))+1 : 1001
+
+      // Backfill tax_rate for old invoices missing it
+      let invoicesData = invoices.data || []
+      let needsBackfill = invoicesData.some(inv => inv.tax_rate == null)
+      if (needsBackfill) {
+        console.warn('Backfilling invoices missing tax_rate with default', savedSettings.default_tax_rate, '— historical data may need manual review.')
+        // Update in DB in background (best effort, RLS ensures only own rows)
+        const toBackfill = invoicesData.filter(inv => inv.tax_rate == null).map(inv => inv.id)
+        if (toBackfill.length) {
+          // fire and forget; don't block UI
+          supabase.from('invoices').update({ tax_rate: savedSettings.default_tax_rate }).in('id', toBackfill).then(({error})=>{
+            if (error) console.error('Backfill tax_rate failed', error)
+            else console.info('Backfilled', toBackfill.length, 'invoices with tax_rate', savedSettings.default_tax_rate)
+          })
+        }
+        invoicesData = invoicesData.map(inv => inv.tax_rate == null ? { ...inv, tax_rate: savedSettings.default_tax_rate, _taxMigrated: true } : inv)
+      }
 
       setData({
         clients: clients.data || [],
         income: income.data || [],
         expenses: expenses.data || [],
-        invoices: invoices.data || [],
+        invoices: invoicesData,
         settings: savedSettings,
         invoice_counter: invCounter,
       })
@@ -102,14 +121,25 @@ export function DataProvider({ children }) {
     if (!payload.date) throw new Error('Date is required')
     if (payload.amount == null || payload.amount === '' || isNaN(Number(payload.amount)) || Number(payload.amount) <= 0) throw new Error('Amount must be a positive number')
     if (!payload.description?.trim() || payload.description.trim().length < 2) throw new Error('Description is required (min 2 chars)')
+    const wasFirstEntry = data.income.length === 0 && data.expenses.length === 0
+    const uid = user?.id || 'anon'
     if (useLocalMode) {
       const id='i'+Date.now()
       const next={ ...data, income:[...data.income, { id, ...payload, amount: Number(payload.amount)}]}
-      persist(next); return
+      persist(next);
+      if (wasFirstEntry && !localStorage.getItem(`tracked_first_entry_${uid}`)) {
+        track('first_entry_created', { type: 'income', amount: Number(payload.amount) })
+        localStorage.setItem(`tracked_first_entry_${uid}`, 'true')
+      }
+      return
     }
     const { error } = await supabase.from('income').insert({ ...payload, amount: Number(payload.amount), user_id:user.id })
     if (error) throw new Error(error.message)
     await refresh()
+    if (wasFirstEntry && !localStorage.getItem(`tracked_first_entry_${uid}`)) {
+      track('first_entry_created', { type: 'income', amount: Number(payload.amount) })
+      localStorage.setItem(`tracked_first_entry_${uid}`, 'true')
+    }
   }
   const updateIncome = async (id, payload) => {
     if (payload.amount != null && (isNaN(Number(payload.amount)) || Number(payload.amount) <= 0)) throw new Error('Amount must be positive')
@@ -130,10 +160,21 @@ export function DataProvider({ children }) {
     if (!payload.category?.trim()) throw new Error('Category is required')
     if (payload.amount == null || payload.amount === '' || isNaN(Number(payload.amount)) || Number(payload.amount) <= 0) throw new Error('Amount must be a positive number')
     if (!payload.description?.trim() || payload.description.trim().length < 2) throw new Error('Description is required (min 2 chars)')
-    if (useLocalMode){ const id='e'+Date.now(); persist({...data, expenses:[...data.expenses,{id,...payload, amount: Number(payload.amount)}]}); return}
+    const wasFirstEntry = data.income.length === 0 && data.expenses.length === 0
+    const uid = user?.id || 'anon'
+    if (useLocalMode){ const id='e'+Date.now(); persist({...data, expenses:[...data.expenses,{id,...payload, amount: Number(payload.amount)}]});
+      if (wasFirstEntry && !localStorage.getItem(`tracked_first_entry_${uid}`)) {
+        track('first_entry_created', { type: 'expense', amount: Number(payload.amount) })
+        localStorage.setItem(`tracked_first_entry_${uid}`, 'true')
+      }
+      return}
     const { error } = await supabase.from('expenses').insert({ ...payload, amount: Number(payload.amount), user_id:user.id })
     if (error) throw new Error(error.message)
     await refresh()
+    if (wasFirstEntry && !localStorage.getItem(`tracked_first_entry_${uid}`)) {
+      track('first_entry_created', { type: 'expense', amount: Number(payload.amount) })
+      localStorage.setItem(`tracked_first_entry_${uid}`, 'true')
+    }
   }
   const updateExpense = async (id,payload)=>{
     if (payload.amount != null && (isNaN(Number(payload.amount)) || Number(payload.amount) <= 0)) throw new Error('Amount must be positive')
@@ -154,16 +195,35 @@ export function DataProvider({ children }) {
     if (!payload.issue_date || !payload.due_date) throw new Error('Issue and due dates are required')
     if (!payload.line_items?.length || payload.line_items.some(l=> !l.description?.trim() || Number(l.quantity) <=0 || Number(l.rate) <=0)) throw new Error('Each line item needs description, quantity >0 and rate >0')
     if (payload.total_amount <=0) throw new Error('Invoice total must be positive (rate must be >0)')
+    // Snapshot tax_rate — never read from settings at report time
+    const tax_rate = Number(payload.tax_rate ?? data.settings.default_tax_rate ?? 0)
+    if (isNaN(tax_rate) || tax_rate <0 || tax_rate >100) throw new Error('Tax rate must be 0-100')
+    const subtotal = Number(payload.subtotal ?? payload.total_amount)
+    const tax_amount = Number((subtotal * tax_rate / 100).toFixed(2))
+    const grand_total = Number((subtotal + tax_amount).toFixed(2))
+    const toSave = { ...payload, tax_rate, subtotal, tax_amount, total_amount: grand_total }
+    const wasFirstInvoice = data.invoices.length === 0
+    const uid = user?.id || 'anon'
     if(useLocalMode){
       const num = `INV-${data.invoice_counter}`
       const id='inv'+Date.now()
-      const next={...data, invoices:[...data.invoices,{id, invoice_number:num, ...payload}], invoice_counter: data.invoice_counter+1}
-      persist(next); return num
+      const next={...data, invoices:[...data.invoices,{id, invoice_number:num, ...toSave}], invoice_counter: data.invoice_counter+1}
+      persist(next);
+      if (wasFirstInvoice && !localStorage.getItem(`tracked_first_invoice_${uid}`)) {
+        track('first_invoice_created', { total: grand_total, tax_rate })
+        localStorage.setItem(`tracked_first_invoice_${uid}`, 'true')
+      }
+      return num
     }
     const num = `INV-${data.invoice_counter}`
-    const { error } = await supabase.from('invoices').insert({ ...payload, invoice_number:num, user_id:user.id })
+    const { error } = await supabase.from('invoices').insert({ ...toSave, invoice_number:num, user_id:user.id })
     if (error) throw new Error(error.message)
-    await refresh(); return num
+    await refresh();
+    if (wasFirstInvoice && !localStorage.getItem(`tracked_first_invoice_${uid}`)) {
+      track('first_invoice_created', { total: grand_total, tax_rate })
+      localStorage.setItem(`tracked_first_invoice_${uid}`, 'true')
+    }
+    return num
   }
   const updateInvoice = async(id,payload)=>{
     if(useLocalMode){ persist({...data, invoices:data.invoices.map(x=> x.id===id? {...x,...payload}:x)}); return}

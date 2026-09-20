@@ -18,8 +18,11 @@ export default function Settings(){
   const submit=async(e)=>{
     e.preventDefault()
     setErr(''); setInfo('')
+    const rate = Number(form.default_tax_rate)
+    if (form.default_tax_rate !== '' && (isNaN(rate) || rate <0 || rate >100)) { setErr('Default tax rate must be 0–100'); return }
     try{
-      await updateSettings(form)
+      const toSave = { ...form, default_tax_rate: form.default_tax_rate === '' ? 18 : rate }
+      await updateSettings(toSave)
       setSaved(true); setInfo('Settings saved')
       setTimeout(()=>{setSaved(false); setInfo('')},2000)
     }catch(ex){ setErr(ex.message) }
@@ -60,6 +63,9 @@ export default function Settings(){
               <option value="C$">C$ CAD</option>
             </Select>
             <p className="text-xs text-gray-400 mt-1">v1 uses a single symbol (no multi-currency conversions).</p>
+          </div>
+          <div><Label htmlFor="settings-tax">Default GST/VAT rate (%)</Label><Input id="settings-tax" type="number" min="0" max="100" step="0.01" value={form.default_tax_rate ?? 18} onChange={e=>setForm({...form, default_tax_rate: e.target.value === '' ? '' : Number(e.target.value)})} placeholder="18" />
+            <p className="text-xs text-gray-400 mt-1">Used as default for new invoices — each invoice saves its own rate, so changing this never affects old invoices or reports.</p>
           </div>
           <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-xs">
             <div className="font-semibold mb-1">Account</div>

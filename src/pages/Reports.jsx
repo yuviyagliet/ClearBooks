@@ -15,14 +15,24 @@ export default function Reports(){
     const inRange = (dStr)=>{
       const d=new Date(dStr); return d>=f && d<=t
     }
-    if (isInvalidRange) return { income: [], expenses: [], totalIncome: 0, totalExpenses: 0, net: 0, byCategory: {} }
+    if (isInvalidRange) return { income: [], expenses: [], invoices: [], totalIncome: 0, totalExpenses: 0, net: 0, byCategory: {}, totalTax: 0, taxByInvoice: [] }
     const income = data.income.filter(i=> inRange(i.date))
     const expenses = data.expenses.filter(e=> inRange(e.date))
+    const invoices = data.invoices.filter(inv=> inRange(inv.issue_date))
     const totalIncome = income.reduce((s,x)=>s+Number(x.amount),0)
     const totalExpenses = expenses.reduce((s,x)=>s+Number(x.amount),0)
     const byCategory = {}
     expenses.forEach(e=>{ byCategory[e.category]=(byCategory[e.category]||0)+Number(e.amount)})
-    return { income, expenses, totalIncome, totalExpenses, net: totalIncome-totalExpenses, byCategory }
+    // Tax summary: always use each invoice's own stored tax_rate, never global settings
+    const taxByInvoice = invoices.map(inv=>{
+      const rate = Number(inv.tax_rate ?? 0)
+      const grand = Number(inv.total_amount || 0)
+      const sub = Number(inv.subtotal ?? (rate ? grand / (1 + rate/100) : grand))
+      const tax = Number(inv.tax_amount ?? (sub * rate / 100))
+      return { ...inv, _rate: rate, _sub: sub, _tax: tax }
+    })
+    const totalTax = taxByInvoice.reduce((s,inv)=> s + inv._tax, 0)
+    return { income, expenses, invoices, totalIncome, totalExpenses, net: totalIncome-totalExpenses, byCategory, totalTax, taxByInvoice }
   }, [data, from, to, isInvalidRange])
 
   const maxCat = Math.max(1, ...Object.values(filtered.byCategory))
@@ -30,10 +40,11 @@ export default function Reports(){
 
   const handleExport=()=>{
     if (isInvalidRange) return
-    const rows = [['Type','Date','Category/Client','Description','Amount','Currency']]
-    filtered.income.forEach(i=> rows.push(['Income', i.date, i.client_name||'', i.description||'', i.amount, data.settings.currency]))
-    filtered.expenses.forEach(e=> rows.push(['Expense', e.date, e.category||'', e.description||'', e.amount, data.settings.currency]))
-    exportCSV(`clearbooks-${from}_to_${to}.csv`, rows)
+    const rows = [['Type','Date','Invoice Number','Client','Category','Description','Amount','Tax Rate %','Tax Amount','Total','Currency','Status']]
+    filtered.income.forEach(i=> rows.push(['Income', i.date, '', i.client_name||'', '', i.description||'', i.amount, '', '', '', data.settings.currency, '']))
+    filtered.expenses.forEach(e=> rows.push(['Expense', e.date, '', '', e.category||'', e.description||'', e.amount, '', '', '', data.settings.currency, '']))
+    filtered.taxByInvoice.forEach(inv=> rows.push(['Invoice', inv.issue_date, inv.invoice_number, inv.client_name||'', '', (inv.line_items||[]).map(l=>l.description).join('; '), inv._sub, inv._rate, inv._tax, inv.total_amount, data.settings.currency, inv.status]))
+    exportCSV(`clearbooks-export-${from}_to_${to}.csv`, rows)
   }
 
   return (
@@ -50,11 +61,35 @@ export default function Reports(){
       </Card>
       {isInvalidRange && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">The start date must be earlier than or equal to the end date.</div>}
 
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-4 gap-4">
         <Card className="p-5"><div className="text-xs uppercase tracking-wide font-bold text-teal-700">Total income</div><div className="text-2xl font-bold mt-1">{formatCurrency(filtered.totalIncome, data.settings.currency)}</div></Card>
         <Card className="p-5"><div className="text-xs uppercase tracking-wide font-bold text-amber-700">Total expenses</div><div className="text-2xl font-bold mt-1">{formatCurrency(filtered.totalExpenses, data.settings.currency)}</div></Card>
+        <Card className="p-5"><div className="text-xs uppercase tracking-wide font-bold text-violet-700">GST/VAT collected</div><div className="text-2xl font-bold mt-1">{formatCurrency(filtered.totalTax, data.settings.currency)}</div><div className="text-[11px] text-gray-400 mt-1">Sum of each invoice’s own tax_rate</div></Card>
         <Card className="p-5"><div className="text-xs uppercase tracking-wide font-bold text-gray-700">Net profit</div><div className={`text-2xl font-bold mt-1 ${filtered.net>=0?'text-emerald-700':'text-red-600'}`}>{formatCurrency(filtered.net, data.settings.currency)}</div></Card>
       </div>
+      {filtered.invoices.length>0 && (
+        <Card className="p-5">
+          <h3 className="font-semibold mb-3">Tax by invoice (per-invoice rate)</h3>
+          <p className="text-xs text-gray-500 mb-3">Each invoice’s GST/VAT is snapshotted at creation — changing default rate never affects past invoices. {filtered.taxByInvoice.some(i=>i._taxMigrated) && <span className="text-amber-600 font-medium">Some older invoices were backfilled and may need manual review.</span>}</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="text-left px-3 py-2">Invoice</th><th className="text-left px-3 py-2">Date</th><th className="text-right px-3 py-2">Subtotal</th><th className="text-right px-3 py-2">Tax Rate</th><th className="text-right px-3 py-2">Tax</th><th className="text-right px-3 py-2">Total</th></tr></thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.taxByInvoice.map(inv=>(
+                  <tr key={inv.id} className="hover:bg-gray-50/50">
+                    <td className="px-3 py-2 font-mono text-xs">{inv.invoice_number}{inv._taxMigrated && <span className="ml-1 text-amber-600" title="Backfilled, review needed">*</span>}</td>
+                    <td className="px-3 py-2 text-xs">{inv.issue_date}</td>
+                    <td className="px-3 py-2 text-right">{formatCurrency(inv._sub, data.settings.currency)}</td>
+                    <td className="px-3 py-2 text-right">{inv._rate}%</td>
+                    <td className="px-3 py-2 text-right font-medium">{formatCurrency(inv._tax, data.settings.currency)}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{formatCurrency(inv.total_amount, data.settings.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       <div className="grid md:grid-cols-2 gap-4">
         <Card className="p-5">

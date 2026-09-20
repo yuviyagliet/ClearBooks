@@ -1,13 +1,59 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
+import { useAuth } from '../context/AuthContext'
 import { Card, Button, Empty } from '../components/UI'
-import { formatCurrency, last6Months } from '../utils/helpers'
+import { formatCurrency, last6Months, exportCSV } from '../utils/helpers'
+import { track } from '../lib/analytics'
 
 export default function Dashboard(){
   const { data } = useData()
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const [showIncome, setShowIncome] = useState(false)
   const [showExpense, setShowExpense] = useState(false)
+
+  // Auto-launch onboarding: only once, on first signup
+  useEffect(()=>{
+    if (!user) return
+    try {
+      const pending = localStorage.getItem('clearbooks_just_signed_up') === 'true'
+      const onboardedKey = `clearbooks_has_onboarded_${user.id}`
+      const hasOnboarded = localStorage.getItem(onboardedKey) === 'true'
+      const userPending = localStorage.getItem(`clearbooks_onboarding_pending_${user.id}`) === 'true'
+      // Also handle Google OAuth case: if user is new (no data) and never onboarded, treat as pending
+      const isNewUser = (data.income.length===0 && data.expenses.length===0 && data.invoices.length===0) && !hasOnboarded
+      // For Google, check if account age < 5 min and no flag
+      let shouldLaunch = false
+      if ((pending || userPending) && !hasOnboarded) shouldLaunch = true
+      // Fallback for Google first signup: if isNewUser and not hasOnboarded and user created recently, auto-launch once
+      // We check a separate flag to avoid repeat for returning users with empty data
+      if (isNewUser && !hasOnboarded && !pending && !userPending) {
+        // Check if we've ever set the hasOnboarded flag — if never set, this is first visit
+        const hasEverVisited = localStorage.getItem(onboardedKey) !== null
+        if (!hasEverVisited) {
+          // Only auto-launch if user was created within last 10 minutes (to avoid old users with empty data)
+          const createdAt = user.created_at ? new Date(user.created_at).getTime() : Date.now()
+          if (Date.now() - createdAt < 10*60*1000) shouldLaunch = true
+        }
+      }
+      if (shouldLaunch) {
+        localStorage.removeItem('clearbooks_just_signed_up')
+        localStorage.removeItem(`clearbooks_onboarding_pending_${user.id}`)
+        localStorage.setItem(onboardedKey, 'true')
+        // record that onboarding was launched (for verification)
+        try { track('onboarding_auto_launched', { user_id: user.id }) } catch {}
+        navigate('/income?onboarding=first_signup', { replace: true })
+      }
+    } catch {}
+  }, [user, data.income.length, data.expenses.length, data.invoices.length, navigate])
+
+  // Onboarding checklist: 3 items, hide when all complete
+  const hasIncome = data.income.length > 0
+  const hasExpense = data.expenses.length > 0
+  const hasInvoice = data.invoices.length > 0
+  const allDone = hasIncome && hasExpense && hasInvoice
+  const showChecklist = !allDone
 
   const now=new Date()
   const ym = now.toISOString().slice(0,7)
@@ -23,6 +69,21 @@ export default function Dashboard(){
   })
   const maxVal = Math.max(1, ...chartData.flatMap(d=>[d.inc,d.exp]))
 
+  const handleExportAll = ()=>{
+    const rows = [['Type','Date','Invoice Number','Client','Category','Description','Amount','Tax Rate %','Tax Amount','Total','Currency','Status']]
+    data.income.forEach(i=> rows.push(['Income', i.date, '', i.client_name||'', '', i.description||'', i.amount, '', '', '', data.settings.currency, '']))
+    data.expenses.forEach(e=> rows.push(['Expense', e.date, '', '', e.category||'', e.description||'', e.amount, '', '', '', data.settings.currency, '']))
+    data.invoices.forEach(inv=>{
+      const rate = Number(inv.tax_rate ?? 0)
+      const grand = Number(inv.total_amount || 0)
+      const sub = Number(inv.subtotal ?? (rate ? grand / (1 + rate/100) : grand))
+      const tax = Number(inv.tax_amount ?? (sub * rate / 100))
+      rows.push(['Invoice', inv.issue_date, inv.invoice_number, inv.client_name||'', '', (inv.line_items||[]).map(l=>l.description).join('; '), sub, rate, tax, grand, data.settings.currency, inv.status])
+    })
+    const date = new Date().toISOString().slice(0,10)
+    exportCSV(`clearbooks-export-${date}.csv`, rows)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -30,11 +91,47 @@ export default function Dashboard(){
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-sm text-gray-500">Your freelance money at a glance — {now.toLocaleString('en-US',{month:'long', year:'numeric'})}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Link to="/income" className="bg-teal-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-teal-800">＋ Add Income</Link>
           <Link to="/expenses" className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-gray-50">＋ Add Expense</Link>
+          <button onClick={handleExportAll} className="bg-gray-900 text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-black">⬇ Export CSV</button>
         </div>
       </div>
+
+      {showChecklist && (
+        <Card className="p-5 border-teal-200 bg-teal-50/20">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-sm">Get started — 3 steps to activate your ledger</h3>
+              <p className="text-xs text-gray-500 mt-1">Complete these once to get the most out of ClearBooks. This hides automatically when all 3 are done.</p>
+            </div>
+            <span className="text-xs bg-white border border-teal-200 text-teal-700 rounded-full px-2.5 py-1 font-medium">{[hasIncome, hasExpense, hasInvoice].filter(Boolean).length}/3 done</span>
+          </div>
+          <ul className="mt-4 grid gap-2">
+            <li>
+              <Link to="/income" className={`flex items-center gap-3 p-3 rounded-xl border text-sm transition ${hasIncome ? 'bg-white border-emerald-200' : 'bg-white border-gray-200 hover:border-teal-300 hover:bg-teal-50/50'}`}>
+                <span className={`w-7 h-7 rounded-full grid place-items-center text-xs font-bold shrink-0 ${hasIncome ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}>{hasIncome ? '✓' : '1'}</span>
+                <span className={`font-medium ${hasIncome ? 'text-emerald-700 line-through' : 'text-gray-800'}`}>Add your first income</span>
+                <span className={`ml-auto text-xs font-semibold ${hasIncome ? 'text-emerald-600' : 'text-teal-700'}`}>{hasIncome ? 'Done' : '→'}</span>
+              </Link>
+            </li>
+            <li>
+              <Link to="/expenses" className={`flex items-center gap-3 p-3 rounded-xl border text-sm transition ${hasExpense ? 'bg-white border-emerald-200' : 'bg-white border-gray-200 hover:border-teal-300 hover:bg-teal-50/50'}`}>
+                <span className={`w-7 h-7 rounded-full grid place-items-center text-xs font-bold shrink-0 ${hasExpense ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}>{hasExpense ? '✓' : '2'}</span>
+                <span className={`font-medium ${hasExpense ? 'text-emerald-700 line-through' : 'text-gray-800'}`}>Add your first expense</span>
+                <span className={`ml-auto text-xs font-semibold ${hasExpense ? 'text-emerald-600' : 'text-teal-700'}`}>{hasExpense ? 'Done' : '→'}</span>
+              </Link>
+            </li>
+            <li>
+              <Link to="/invoices" className={`flex items-center gap-3 p-3 rounded-xl border text-sm transition ${hasInvoice ? 'bg-white border-emerald-200' : 'bg-white border-gray-200 hover:border-teal-300 hover:bg-teal-50/50'}`}>
+                <span className={`w-7 h-7 rounded-full grid place-items-center text-xs font-bold shrink-0 ${hasInvoice ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}>{hasInvoice ? '✓' : '3'}</span>
+                <span className={`font-medium ${hasInvoice ? 'text-emerald-700 line-through' : 'text-gray-800'}`}>Create your first invoice</span>
+                <span className={`ml-auto text-xs font-semibold ${hasInvoice ? 'text-emerald-600' : 'text-teal-700'}`}>{hasInvoice ? 'Done' : '→'}</span>
+              </Link>
+            </li>
+          </ul>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Stat title="Income this month" value={formatCurrency(incomeMonth, data.settings.currency)} sub={`${data.income.filter(i=>i.date?.slice(0,7)===ym).length} entries`} color="teal" />

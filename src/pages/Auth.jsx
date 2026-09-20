@@ -22,6 +22,11 @@ export function Signup(){
   const [info,setInfo]=useState('')
   const [loading,setLoading]=useState(false)
   const [googleLoading,setGoogleLoading]=useState(false)
+  const hasTrackedStarted = useState(false)
+  useEffect(()=>{
+    // track when signup form is first viewed / interacted
+    import('../lib/analytics').then(({ track })=> track('signup_started', { method: 'email' }))
+  },[])
   const onSubmit = async(e)=>{
     e.preventDefault(); setErr(''); setInfo(''); 
     if(password.length < 6){ setErr('Password must be at least 6 characters.'); return }
@@ -30,8 +35,18 @@ export function Signup(){
     setLoading(false)
     if(error) setErr(error.message)
     else {
+      // track completion
+      import('../lib/analytics').then(({ track })=> track('signup_completed', { method: 'email' }))
       if (data?.session) {
-        navigate('/dashboard')
+        // mark onboarding as seen so Dashboard won't auto-launch again; we go directly to Add income
+        try {
+          if (data.session.user?.id) {
+            localStorage.setItem('clearbooks_has_onboarded_' + data.session.user.id, 'true')
+            localStorage.removeItem('clearbooks_just_signed_up')
+            localStorage.removeItem('clearbooks_onboarding_pending_' + data.session.user.id)
+          }
+        } catch {}
+        navigate('/income?onboarding=first_signup')
       } else {
         setInfo('Account created! Check your email to confirm, then log in.')
         setTimeout(()=> navigate('/login'), 1200)

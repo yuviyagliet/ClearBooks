@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useData } from '../context/DataContext'
 import { Card, Button, Input, Select, Label, Empty } from '../components/UI'
 import { formatCurrency } from '../utils/helpers'
@@ -6,14 +6,21 @@ import jsPDF from 'jspdf'
 
 export default function InvoicesPage(){
   const { data, addInvoice, updateInvoice, deleteInvoice, addClient } = useData()
-  const [form,setForm]=useState({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', line_items:[{description:'', quantity:1, rate:0}]})
+  const [form,setForm]=useState({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', tax_rate: data.settings.default_tax_rate ?? 18, line_items:[{description:'', quantity:1, rate:0}]})
   const [editing,setEditing]=useState(null)
   const [err,setErr]=useState('')
   const [info,setInfo]=useState('')
   const [newClientName,setNewClientName]=useState('')
   const [showNewClient,setShowNewClient]=useState(false)
 
-  const total = useMemo(()=> form.line_items.reduce((s,l)=> s + (Number(l.quantity)||0)*(Number(l.rate)||0),0), [form.line_items])
+  // Keep tax_rate in sync with settings default for new invoices (not when editing)
+  useEffect(()=>{
+    if (!editing) setForm(f=> ({ ...f, tax_rate: data.settings.default_tax_rate ?? 18 }))
+  }, [data.settings.default_tax_rate, editing])
+  const subtotal = useMemo(()=> form.line_items.reduce((s,l)=> s + (Number(l.quantity)||0)*(Number(l.rate)||0),0), [form.line_items])
+  const tax_rate_num = Number(form.tax_rate) || 0
+  const tax_amount = useMemo(()=> Number((subtotal * tax_rate_num / 100).toFixed(2)), [subtotal, tax_rate_num])
+  const total = useMemo(()=> Number((subtotal + tax_amount).toFixed(2)), [subtotal, tax_amount])
   const addLine=()=> setForm({...form, line_items:[...form.line_items,{description:'',quantity:1,rate:0}]})
   const updateLine=(idx, patch)=> setForm({...form, line_items: form.line_items.map((l,i)=> i===idx? {...l,...patch}:l )})
   const removeLine=(idx)=> setForm({...form, line_items: form.line_items.filter((_,i)=>i!==idx)})
@@ -32,6 +39,7 @@ export default function InvoicesPage(){
       if(isNaN(Number(l.rate)) || Number(l.rate) <=0){ setErr(`Line ${i+1}: rate must be >0`); return }
     }
     if(total <=0){ setErr('Invoice total must be positive'); return }
+    if (tax_rate_num <0 || tax_rate_num >100) { setErr('Tax rate must be 0–100'); return }
     const client = data.clients.find(c=>c.id===form.client_id)
     const payload = {
       client_id: form.client_id||null,
@@ -39,6 +47,9 @@ export default function InvoicesPage(){
       issue_date: form.issue_date,
       due_date: form.due_date,
       status: form.status,
+      tax_rate: tax_rate_num,
+      subtotal,
+      tax_amount,
       line_items: form.line_items.map(l=> ({...l, description:l.description.trim(), quantity: Number(l.quantity), rate: Number(l.rate), total: (Number(l.quantity)||0)*(Number(l.rate)||0)})),
       total_amount: total,
     }
@@ -46,7 +57,7 @@ export default function InvoicesPage(){
       if(editing) await updateInvoice(editing, payload)
       else await addInvoice(payload)
       setInfo(editing ? 'Invoice updated!' : `Invoice created! ${payload.invoice_number||''}`)
-      setForm({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', line_items:[{description:'', quantity:1, rate:0}]}); setEditing(null)
+      setForm({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', tax_rate: data.settings.default_tax_rate ?? 18, line_items:[{description:'', quantity:1, rate:0}]}); setEditing(null)
       setTimeout(()=> setInfo(''), 3000)
     }catch(ex){ setErr(ex.message) }
   }
@@ -60,7 +71,7 @@ export default function InvoicesPage(){
     }catch(ex){ setErr(ex.message) }
   }
   const startEdit=(inv)=>{
-    setEditing(inv.id); setForm({ client_id:inv.client_id||'', issue_date:inv.issue_date, due_date:inv.due_date, status:inv.status, line_items: inv.line_items?.length? inv.line_items: [{description:'',quantity:1,rate:0}]})
+    setEditing(inv.id); setForm({ client_id:inv.client_id||'', issue_date:inv.issue_date, due_date:inv.due_date, status:inv.status, tax_rate: inv.tax_rate ?? 0, line_items: inv.line_items?.length? inv.line_items: [{description:'',quantity:1,rate:0}]})
     setErr(''); window.scrollTo({top:0,behavior:'smooth'})
   }
 
@@ -104,7 +115,14 @@ export default function InvoicesPage(){
       y+=6
     })
     y+=4; doc.line(14,y,196,y)
-    y+=8; doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.text(`Total: ${currency}${Number(inv.total_amount).toFixed(2)}`, 150, y)
+    y+=8; doc.setFont('helvetica','normal'); doc.setFontSize(10)
+    const rate = Number(inv.tax_rate ?? 0)
+    const grand = Number(inv.total_amount)
+    const sub = Number(inv.subtotal ?? (rate ? grand / (1 + rate/100) : grand))
+    const tax = Number(inv.tax_amount ?? (sub * rate / 100))
+    doc.text(`Subtotal: ${currency}${sub.toFixed(2)}`, 150, y)
+    y+=6; doc.text(`GST/VAT (${rate}%): ${currency}${tax.toFixed(2)}`, 150, y)
+    y+=6; doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.text(`Total: ${currency}${grand.toFixed(2)}`, 150, y)
     y+=10; doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120); doc.text('Thank you for your business!', 14, y)
     doc.text('Generated by ClearBooks', 14, y+5)
     doc.save(`${inv.invoice_number}.pdf`)
@@ -130,7 +148,12 @@ export default function InvoicesPage(){
             <div><Label htmlFor="invoice-issue">Issue date *</Label><Input id="invoice-issue" type="date" value={form.issue_date} onChange={e=>setForm({...form, issue_date:e.target.value})} required /></div>
             <div><Label htmlFor="invoice-due">Due date *</Label><Input id="invoice-due" type="date" value={form.due_date} onChange={e=>setForm({...form, due_date:e.target.value})} required /></div>
           </div>
-          <div className="max-w-xs"><Label>Status</Label><Select value={form.status} onChange={e=>setForm({...form, status:e.target.value})}><option>Unpaid</option><option>Paid</option><option>Overdue</option></Select></div>
+          <div className="grid md:grid-cols-2 gap-4 max-w-lg">
+            <div><Label htmlFor="invoice-status">Status</Label><Select id="invoice-status" value={form.status} onChange={e=>setForm({...form, status:e.target.value})}><option>Unpaid</option><option>Paid</option><option>Overdue</option></Select></div>
+            <div><Label htmlFor="invoice-tax">GST/VAT Rate (%) *</Label><Input id="invoice-tax" type="number" min="0" max="100" step="0.01" value={form.tax_rate} onChange={e=>setForm({...form, tax_rate: e.target.value})} required />
+              <p className="text-[11px] text-gray-400 mt-1">Snapshotted per invoice — changing default later won’t affect this invoice.</p>
+            </div>
+          </div>
 
           <div>
             <div className="flex items-center justify-between mb-2"><Label>Line items *</Label><Button type="button" variant="ghost" onClick={addLine} className="text-xs py-1.5">＋ Add line</Button></div>
@@ -145,7 +168,12 @@ export default function InvoicesPage(){
                 </div>
               ))}
             </div>
-            <div className="text-right font-bold mt-3 text-lg">Total: {formatCurrency(total, data.settings.currency)}</div>
+            <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 mt-3 space-y-1 text-sm">
+              <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(subtotal, data.settings.currency)}</span></div>
+              <div className="flex justify-between"><span>GST/VAT ({tax_rate_num}%)</span><span>{formatCurrency(tax_amount, data.settings.currency)}</span></div>
+              <div className="flex justify-between font-bold text-lg border-t pt-1"><span>Total</span><span>{formatCurrency(total, data.settings.currency)}</span></div>
+              <p className="text-[11px] text-gray-400">Tax rate is snapshotted — yearly reports use each invoice’s own rate.</p>
+            </div>
           </div>
 
           {err && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-2.5">{err}</div>}
@@ -153,7 +181,7 @@ export default function InvoicesPage(){
 
           <div className="flex gap-2">
             <Button type="submit">{editing?'Update invoice':'Create invoice'}</Button>
-            {editing && <Button type="button" variant="ghost" onClick={()=>{setEditing(null); setForm({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', line_items:[{description:'', quantity:1, rate:0}]}); setErr('')}}>Cancel</Button>}
+            {editing && <Button type="button" variant="ghost" onClick={()=>{setEditing(null); setForm({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', tax_rate: data.settings.default_tax_rate ?? 18, line_items:[{description:'', quantity:1, rate:0}]}); setErr('')}}>Cancel</Button>}
           </div>
         </form>
       </Card>
@@ -162,15 +190,18 @@ export default function InvoicesPage(){
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="text-left px-4 py-3">Number</th><th className="text-left px-4 py-3">Client</th><th className="text-left px-4 py-3">Dates</th><th className="text-right px-4 py-3">Total</th><th className="text-center px-4 py-3">Status</th><th className="px-4 py-3"></th></tr></thead>
+              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="text-left px-4 py-3">Number</th><th className="text-left px-4 py-3">Client</th><th className="text-left px-4 py-3">Dates</th><th className="text-right px-4 py-3">Tax</th><th className="text-right px-4 py-3">Total</th><th className="text-center px-4 py-3">Status</th><th className="px-4 py-3"></th></tr></thead>
               <tbody className="divide-y divide-gray-100">
                 {[...data.invoices].sort((a,b)=> b.invoice_number.localeCompare(a.invoice_number)).map(inv=>{
                   const s=getStatus(inv)
+                  const rate = inv.tax_rate ?? 0
+                  const sub = inv.subtotal ?? (inv.total_amount && rate ? Number((inv.total_amount / (1 + rate/100)).toFixed(2)) : inv.total_amount)
                   return (
                     <tr key={inv.id} className="hover:bg-gray-50/50">
                       <td className="px-4 py-3 font-mono text-xs font-semibold">{inv.invoice_number}</td>
                       <td className="px-4 py-3">{inv.client_name}</td>
                       <td className="px-4 py-3 text-xs leading-tight">{inv.issue_date} → {inv.due_date}</td>
+                      <td className="px-4 py-3 text-right text-xs">{rate}%</td>
                       <td className="px-4 py-3 text-right font-semibold">{formatCurrency(inv.total_amount, data.settings.currency)}</td>
                       <td className="px-4 py-3 text-center">{badge(s)}</td>
                       <td className="px-4 py-3">

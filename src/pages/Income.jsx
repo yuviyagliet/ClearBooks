@@ -1,16 +1,26 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams, Link } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { Card, Button, Input, Select, Label, Empty } from '../components/UI'
 import { formatCurrency } from '../utils/helpers'
 
 export default function IncomePage(){
   const { data, addIncome, updateIncome, deleteIncome, addClient } = useData()
+  const [searchParams] = useSearchParams()
+  const isOnboarding = searchParams.get('onboarding') === 'first_signup'
   const [form, setForm] = useState({ date: new Date().toISOString().slice(0,10), client_id:'', amount:'', description:'' })
   const [editing, setEditing] = useState(null)
   const [newClientName, setNewClientName] = useState('')
   const [showNewClient, setShowNewClient] = useState(false)
   const [err,setErr]=useState('')
   const [info,setInfo]=useState('')
+
+  useEffect(()=>{
+    if (isOnboarding) {
+      // focus amount field for onboarding
+      setTimeout(()=> document.getElementById('income-amount')?.focus(), 300)
+    }
+  },[isOnboarding])
 
   const submit = async(e)=>{
     e.preventDefault()
@@ -47,6 +57,15 @@ export default function IncomePage(){
 
   return (
     <div className="space-y-6">
+      {isOnboarding && (
+        <div className="bg-teal-700 text-white rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h2 className="font-bold text-base">Welcome to ClearBooks! Let’s add your first income.</h2>
+            <p className="text-teal-100 text-sm mt-1">This is the Add income form — fill it and your dashboard checklist will update.</p>
+          </div>
+          <Link to="/dashboard" className="text-xs bg-white text-teal-700 rounded-full px-4 py-2 font-semibold hover:bg-teal-50 self-start md:self-center">Skip → Dashboard</Link>
+        </div>
+      )}
       <div><h1 className="text-2xl font-bold">Income</h1><p className="text-sm text-gray-500">Log client payments & revenue.</p></div>
 
       <Card className="p-5">

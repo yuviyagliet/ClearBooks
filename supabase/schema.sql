@@ -53,7 +53,7 @@ create policy "Users manage own expenses" on public.expenses
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create index if not exists expenses_user_id_idx on public.expenses(user_id);
 
--- INVOICES
+-- INVOICES — tax_rate is snapshotted per invoice (e.g., 18 for 18% GST/VAT) so old invoices never recalc when global rate changes
 create table if not exists public.invoices (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -65,9 +65,17 @@ create table if not exists public.invoices (
   status text not null check (status in ('Paid','Unpaid','Overdue')),
   line_items jsonb not null default '[]'::jsonb,
   total_amount numeric not null check (total_amount > 0),
+  tax_rate numeric not null default 0 check (tax_rate >= 0 and tax_rate <= 100),
   created_at timestamp with time zone default now(),
   unique(user_id, invoice_number)
 );
+-- Migration: add tax_rate if table already existed without it
+alter table public.invoices add column if not exists tax_rate numeric not null default 0 check (tax_rate >= 0 and tax_rate <= 100);
+-- Backfill: existing invoices without a meaningful rate get 0 and should be reviewed; set to current default (e.g., 18) if you prefer:
+-- update public.invoices set tax_rate = 18 where tax_rate is null or tax_rate = 0;
+-- To flag historical rows needing review:
+-- alter table public.invoices add column if not exists tax_rate_migrated boolean default false;
+-- update public.invoices set tax_rate_migrated = true where tax_rate = 0;
 alter table public.invoices enable row level security;
 drop policy if exists "Users manage own invoices" on public.invoices;
 create policy "Users manage own invoices" on public.invoices
@@ -84,6 +92,7 @@ insert into storage.buckets (id, name, public) values ('receipts','receipts', tr
 -- Drop old permissive policies if they exist
 drop policy if exists "Users upload own receipts" on storage.objects;
 drop policy if exists "Users view own receipts" on storage.objects;
+drop policy if exists "Users update own receipts" on storage.objects;
 drop policy if exists "Users delete own receipts" on storage.objects;
 drop policy if exists "Public read receipts" on storage.objects;
 drop policy if exists "Give users access to own folder receipts" on storage.objects;

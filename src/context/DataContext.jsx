@@ -152,8 +152,8 @@ export function DataProvider({ children }) {
   const addInvoice = async (payload)=>{
     if (!payload.client_id) throw new Error('Client is required')
     if (!payload.issue_date || !payload.due_date) throw new Error('Issue and due dates are required')
-    if (!payload.line_items?.length || payload.line_items.some(l=> !l.description?.trim() || Number(l.quantity) <=0 || Number(l.rate) <0)) throw new Error('Each line item needs description, quantity >0 and rate ≥0')
-    if (payload.total_amount <=0) throw new Error('Invoice total must be positive')
+    if (!payload.line_items?.length || payload.line_items.some(l=> !l.description?.trim() || Number(l.quantity) <=0 || Number(l.rate) <=0)) throw new Error('Each line item needs description, quantity >0 and rate >0')
+    if (payload.total_amount <=0) throw new Error('Invoice total must be positive (rate must be >0)')
     if(useLocalMode){
       const num = `INV-${data.invoice_counter}`
       const id='inv'+Date.now()

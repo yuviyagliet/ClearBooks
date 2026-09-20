@@ -29,7 +29,7 @@ export default function InvoicesPage(){
       const l=form.line_items[i]
       if(!l.description.trim() || l.description.trim().length <2){ setErr(`Line ${i+1}: description min 2 chars`); return }
       if(Number(l.quantity) <=0){ setErr(`Line ${i+1}: quantity must be >0`); return }
-      if(Number(l.rate) <0 || isNaN(Number(l.rate))){ setErr(`Line ${i+1}: rate must be ≥0`); return }
+      if(isNaN(Number(l.rate)) || Number(l.rate) <=0){ setErr(`Line ${i+1}: rate must be >0`); return }
     }
     if(total <=0){ setErr('Invoice total must be positive'); return }
     const client = data.clients.find(c=>c.id===form.client_id)
@@ -119,16 +119,16 @@ export default function InvoicesPage(){
         <form onSubmit={submit} className="space-y-4">
           <div className="grid md:grid-cols-3 gap-4">
             <div>
-              <Label>Client *</Label>
+              <Label htmlFor="invoice-client">Client *</Label>
               <div className="flex gap-2">
-                <Select value={form.client_id} onChange={e=>setForm({...form, client_id:e.target.value})}><option value="">Select client</option>{data.clients.map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
+                <Select id="invoice-client" value={form.client_id} onChange={e=>setForm({...form, client_id:e.target.value})}><option value="">Select client</option>{data.clients.map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
                 <Button type="button" variant="ghost" onClick={()=>setShowNewClient(v=>!v)} className="px-2.5">＋</Button>
               </div>
-              {showNewClient && <div className="flex gap-2 mt-2"><Input placeholder="New client name (min 2 chars)" value={newClientName} onChange={e=>setNewClientName(e.target.value)} /><Button type="button" onClick={handleAddClient} className="text-xs">Add</Button></div>}
+              {showNewClient && <div className="flex gap-2 mt-2"><Input id="invoice-new-client" placeholder="New client name (min 2 chars)" value={newClientName} onChange={e=>setNewClientName(e.target.value)} /><Button type="button" onClick={handleAddClient} className="text-xs">Add</Button></div>}
               {data.clients.length===0 && !showNewClient && <p className="text-xs text-amber-600 mt-1">No clients yet — click ＋ to add one, or go to Clients page.</p>}
             </div>
-            <div><Label>Issue date *</Label><Input type="date" value={form.issue_date} onChange={e=>setForm({...form, issue_date:e.target.value})} required /></div>
-            <div><Label>Due date *</Label><Input type="date" value={form.due_date} onChange={e=>setForm({...form, due_date:e.target.value})} required /></div>
+            <div><Label htmlFor="invoice-issue">Issue date *</Label><Input id="invoice-issue" type="date" value={form.issue_date} onChange={e=>setForm({...form, issue_date:e.target.value})} required /></div>
+            <div><Label htmlFor="invoice-due">Due date *</Label><Input id="invoice-due" type="date" value={form.due_date} onChange={e=>setForm({...form, due_date:e.target.value})} required /></div>
           </div>
           <div className="max-w-xs"><Label>Status</Label><Select value={form.status} onChange={e=>setForm({...form, status:e.target.value})}><option>Unpaid</option><option>Paid</option><option>Overdue</option></Select></div>
 
@@ -137,9 +137,9 @@ export default function InvoicesPage(){
             <div className="space-y-2">
               {form.line_items.map((l,i)=>(
                 <div key={i} className="grid grid-cols-12 gap-2 items-end bg-gray-50 border border-gray-100 rounded-xl p-3">
-                  <div className="col-span-12 md:col-span-6"><Label>Description *</Label><Input value={l.description} onChange={e=>updateLine(i,{description:e.target.value})} placeholder="Web design" required minLength={2} /></div>
-                  <div className="col-span-4 md:col-span-2"><Label>Qty *</Label><Input type="number" min="1" step="1" value={l.quantity} onChange={e=>updateLine(i,{quantity:e.target.value})} required /></div>
-                  <div className="col-span-4 md:col-span-2"><Label>Rate ({data.settings.currency}) *</Label><Input type="number" min="0" step="0.01" value={l.rate} onChange={e=>updateLine(i,{rate:e.target.value})} required /></div>
+                  <div className="col-span-12 md:col-span-6"><Label htmlFor={`invoice-desc-${i}`}>Description *</Label><Input id={`invoice-desc-${i}`} value={l.description} onChange={e=>updateLine(i,{description:e.target.value})} placeholder="Web design" required minLength={2} /></div>
+                  <div className="col-span-4 md:col-span-2"><Label htmlFor={`invoice-qty-${i}`}>Qty *</Label><Input id={`invoice-qty-${i}`} type="number" min="1" step="1" value={l.quantity} onChange={e=>updateLine(i,{quantity:e.target.value})} required /></div>
+                  <div className="col-span-4 md:col-span-2"><Label htmlFor={`invoice-rate-${i}`}>Rate ({data.settings.currency}) *</Label><Input id={`invoice-rate-${i}`} type="number" min="0.01" step="0.01" value={l.rate} onChange={e=>updateLine(i,{rate:e.target.value})} required /></div>
                   <div className="col-span-3 md:col-span-1 text-sm font-semibold text-right">{formatCurrency((Number(l.quantity)||0)*(Number(l.rate)||0), data.settings.currency)}</div>
                   <div className="col-span-1 flex justify-end"><button type="button" onClick={()=>removeLine(i)} className="text-xs text-red-600 hover:underline" disabled={form.line_items.length===1}>✕</button></div>
                 </div>

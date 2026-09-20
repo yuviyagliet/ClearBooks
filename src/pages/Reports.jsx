@@ -44,8 +44,8 @@ export default function Reports(){
       </div>
 
       <Card className="p-5 flex flex-wrap gap-4 items-end">
-        <div><Label>From</Label><Input type="date" value={from} onChange={e=>setFrom(e.target.value)} max={to} /></div>
-        <div><Label>To</Label><Input type="date" value={to} onChange={e=>setTo(e.target.value)} min={from} /></div>
+        <div><Label htmlFor="reports-from">From</Label><Input id="reports-from" type="date" value={from} onChange={e=>setFrom(e.target.value)} max={to} /></div>
+        <div><Label htmlFor="reports-to">To</Label><Input id="reports-to" type="date" value={to} onChange={e=>setTo(e.target.value)} min={from} /></div>
         <div className="text-xs text-gray-500 pb-2">Showing {filtered.income.length} income + {filtered.expenses.length} expenses</div>
       </Card>
       {isInvalidRange && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">The start date must be earlier than or equal to the end date.</div>}

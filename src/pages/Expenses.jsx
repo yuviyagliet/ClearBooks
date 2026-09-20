@@ -76,21 +76,21 @@ export default function ExpensesPage(){
       <Card className="p-5">
         <h2 className="font-semibold mb-4">{editing?'Edit expense':'Add expense'}</h2>
         <form onSubmit={submit} className="grid md:grid-cols-2 gap-4">
-          <div><Label>Date *</Label><Input type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} required /></div>
+          <div><Label htmlFor="expense-date">Date *</Label><Input id="expense-date" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} required /></div>
           <div>
-            <Label>Category *</Label>
-            <Select value={form.category} onChange={e=>setForm({...form, category:e.target.value})}>
+            <Label htmlFor="expense-category">Category *</Label>
+            <Select id="expense-category" value={form.category} onChange={e=>setForm({...form, category:e.target.value})}>
               {categories.map(c=> <option key={c} value={c}>{c}</option>)}
               <option value="__custom">＋ Add custom…</option>
             </Select>
-            {form.category==='__custom' && <Input className="mt-2" placeholder="Custom category (min 2 chars)" value={form.customCategory} onChange={e=>setForm({...form, customCategory:e.target.value})} required />}
+            {form.category==='__custom' && <Input id="expense-custom-category" className="mt-2" placeholder="Custom category (min 2 chars)" value={form.customCategory} onChange={e=>setForm({...form, customCategory:e.target.value})} required />}
           </div>
-          <div><Label>Amount ({data.settings.currency}) *</Label><Input type="number" step="0.01" min="0.01" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} required placeholder="49.00" /></div>
-          <div><Label>Description *</Label><Input value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Adobe CC, flight, laptop…" required minLength={2} /></div>
+          <div><Label htmlFor="expense-amount">Amount ({data.settings.currency}) *</Label><Input id="expense-amount" type="number" step="0.01" min="0.01" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} required placeholder="49.00" /></div>
+          <div><Label htmlFor="expense-description">Description *</Label><Input id="expense-description" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Adobe CC, flight, laptop…" required minLength={2} /></div>
           <div className="md:col-span-2">
-            <Label>Receipt image (optional, max 5MB)</Label>
+            <Label htmlFor="expense-receipt">Receipt image (optional, max 5MB)</Label>
             <div className="flex gap-2 items-center">
-              <Input type="file" accept="image/*" onChange={handleReceipt} className="flex-1" />
+              <Input id="expense-receipt" type="file" accept="image/*" onChange={handleReceipt} className="flex-1" />
               {uploading && <span className="text-xs text-gray-500">Uploading…</span>}
             </div>
             {form.receipt_url && <div className="mt-2 flex items-center gap-2"><img src={form.receipt_url} alt="receipt" className="w-16 h-16 object-cover rounded-xl border" /><a href={form.receipt_url} target="_blank" rel="noreferrer" className="text-xs text-teal-700 underline">View receipt</a><button type="button" onClick={()=>setForm({...form,receipt_url:''})} className="text-xs border rounded-full px-2 py-1">Remove</button></div>}

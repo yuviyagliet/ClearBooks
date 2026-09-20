@@ -31,9 +31,9 @@ export default function ClientsPage(){
       <Card className="p-5">
         <h2 className="font-semibold mb-4">{editing?'Edit client':'Add client'}</h2>
         <form onSubmit={submit} className="grid md:grid-cols-3 gap-4">
-          <div><Label>Name *</Label><Input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} required placeholder="Acme Co" minLength={2} /></div>
-          <div><Label>Email</Label><Input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="hello@acme.co" /></div>
-          <div><Label>Notes</Label><Input value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="Retainer, Net 15…" /></div>
+          <div><Label htmlFor="client-name">Name *</Label><Input id="client-name" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} required placeholder="Acme Co" minLength={2} /></div>
+          <div><Label htmlFor="client-email">Email</Label><Input id="client-email" type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="hello@acme.co" /></div>
+          <div><Label htmlFor="client-notes">Notes</Label><Input id="client-notes" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="Retainer, Net 15…" /></div>
           {err && <div className="md:col-span-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-2.5">{err}</div>}
           {info && <div className="md:col-span-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-2.5">{info}</div>}
           <div className="md:col-span-3 flex gap-2">

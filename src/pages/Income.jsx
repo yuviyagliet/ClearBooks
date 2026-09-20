@@ -52,20 +52,20 @@ export default function IncomePage(){
       <Card className="p-5">
         <h2 className="font-semibold mb-4">{editing?'Edit income':'Add income'}</h2>
         <form onSubmit={submit} className="grid md:grid-cols-2 gap-4">
-          <div><Label>Date *</Label><Input type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} required /></div>
+          <div><Label htmlFor="income-date">Date *</Label><Input id="income-date" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} required /></div>
           <div>
-            <Label>Client</Label>
+            <Label htmlFor="income-client">Client</Label>
             <div className="flex gap-2">
-              <Select value={form.client_id} onChange={e=>setForm({...form, client_id:e.target.value})}>
+              <Select id="income-client" value={form.client_id} onChange={e=>setForm({...form, client_id:e.target.value})}>
                 <option value="">— No client —</option>
                 {data.clients.map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
               <Button type="button" variant="ghost" onClick={()=>setShowNewClient(v=>!v)}>＋</Button>
             </div>
-            {showNewClient && <div className="flex gap-2 mt-2"><Input placeholder="New client name (min 2 chars)" value={newClientName} onChange={e=>setNewClientName(e.target.value)} /><Button type="button" onClick={handleAddClient}>Add</Button></div>}
+            {showNewClient && <div className="flex gap-2 mt-2"><Input id="income-new-client" placeholder="New client name (min 2 chars)" value={newClientName} onChange={e=>setNewClientName(e.target.value)} /><Button type="button" onClick={handleAddClient}>Add</Button></div>}
           </div>
-          <div><Label>Amount ({data.settings.currency}) *</Label><Input type="number" step="0.01" min="0.01" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})} required placeholder="1500.00" /></div>
-          <div><Label>Description / notes *</Label><Input value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Project milestone, retainer…" required minLength={2} /></div>
+          <div><Label htmlFor="income-amount">Amount ({data.settings.currency}) *</Label><Input id="income-amount" type="number" step="0.01" min="0.01" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})} required placeholder="1500.00" /></div>
+          <div><Label htmlFor="income-desc">Description / notes *</Label><Input id="income-desc" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Project milestone, retainer…" required minLength={2} /></div>
           {err && <div className="md:col-span-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-2.5">{err}</div>}
           {info && <div className="md:col-span-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-2.5">{info}</div>}
           <div className="md:col-span-2 flex gap-2">

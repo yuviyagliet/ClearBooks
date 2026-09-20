@@ -74,8 +74,10 @@ create policy "Users manage own invoices" on public.invoices
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create index if not exists invoices_user_id_idx on public.invoices(user_id);
 
--- STORAGE BUCKET for receipts (per-user scoped)
+-- STORAGE BUCKET for receipts (per-user scoped, private recommended for production)
+-- For maximal privacy, set public = false and use signed URLs (requires code change to createSignedUrl)
 insert into storage.buckets (id, name, public) values ('receipts','receipts', true) on conflict (id) do nothing;
+-- To enforce private: update storage.buckets set public = false where id = 'receipts';
 
 -- Storage RLS - scoped to receipts/{user_id}/...
 -- Ensure storage.objects RLS is enabled (it is by default)
@@ -99,10 +101,7 @@ create policy "Users view own receipts"
 on storage.objects for select
 using (
   bucket_id = 'receipts'
-  and (
-    (storage.foldername(name))[1] = auth.uid()::text
-    or bucket_id = 'receipts' -- allow public read via URL (bucket is public); remove if you want private only
-  )
+  and (storage.foldername(name))[1] = auth.uid()::text
 );
 
 create policy "Users update own receipts"

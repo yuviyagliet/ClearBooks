@@ -94,8 +94,8 @@ export default function ExpensesPage(){
               {uploading && <span className="text-xs text-gray-500">Uploading…</span>}
             </div>
             {form.receipt_url && <div className="mt-2 flex items-center gap-2"><img src={form.receipt_url} alt="receipt" className="w-16 h-16 object-cover rounded-xl border" /><a href={form.receipt_url} target="_blank" rel="noreferrer" className="text-xs text-teal-700 underline">View receipt</a><button type="button" onClick={()=>setForm({...form,receipt_url:''})} className="text-xs border rounded-full px-2 py-1">Remove</button></div>}
-            {!useLocalMode && <p className="text-[11px] text-gray-400 mt-1">Stored in Supabase Storage bucket <code>receipts/{'{user_id}'}</code> — RLS isolated per user. Bucket must be public or have select policy.</p>}
-            {useLocalMode && <p className="text-[11px] text-amber-600 mt-1">Demo mode: receipt stored as data URL. Configure Supabase for real per-user storage.</p>}
+            {!useLocalMode && <p className="text-[11px] text-gray-400 mt-1">Stored privately in Supabase Storage <code>receipts/{'{user_id}'}</code> — RLS isolated per user (only you can view). Bucket is private with user-scoped policies.</p>}
+            {useLocalMode && <p className="text-[11px] text-amber-600 mt-1">Demo mode: receipt stored as data URL. Configure Supabase for private per-user storage.</p>}
           </div>
           {err && <div className="md:col-span-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-2.5">{err}</div>}
           {info && <div className="md:col-span-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-2.5">{info}</div>}

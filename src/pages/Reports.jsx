@@ -8,11 +8,14 @@ export default function Reports(){
   const [from, setFrom] = useState(()=> new Date(new Date().getFullYear(),0,1).toISOString().slice(0,10))
   const [to, setTo] = useState(()=> new Date().toISOString().slice(0,10))
 
+  const isInvalidRange = useMemo(()=> new Date(from) > new Date(to), [from, to])
+
   const filtered = useMemo(()=>{
     const f = new Date(from), t = new Date(to)
     const inRange = (dStr)=>{
       const d=new Date(dStr); return d>=f && d<=t
     }
+    if (isInvalidRange) return { income: [], expenses: [], totalIncome: 0, totalExpenses: 0, net: 0, byCategory: {} }
     const income = data.income.filter(i=> inRange(i.date))
     const expenses = data.expenses.filter(e=> inRange(e.date))
     const totalIncome = income.reduce((s,x)=>s+Number(x.amount),0)
@@ -20,12 +23,13 @@ export default function Reports(){
     const byCategory = {}
     expenses.forEach(e=>{ byCategory[e.category]=(byCategory[e.category]||0)+Number(e.amount)})
     return { income, expenses, totalIncome, totalExpenses, net: totalIncome-totalExpenses, byCategory }
-  }, [data, from, to])
+  }, [data, from, to, isInvalidRange])
 
   const maxCat = Math.max(1, ...Object.values(filtered.byCategory))
   const colors = ['#0f766e','#f59e0b','#6366f1','#ec4899','#14b8a6','#f97316','#8b5cf6']
 
   const handleExport=()=>{
+    if (isInvalidRange) return
     const rows = [['Type','Date','Category/Client','Description','Amount','Currency']]
     filtered.income.forEach(i=> rows.push(['Income', i.date, i.client_name||'', i.description||'', i.amount, data.settings.currency]))
     filtered.expenses.forEach(e=> rows.push(['Expense', e.date, e.category||'', e.description||'', e.amount, data.settings.currency]))
@@ -36,14 +40,15 @@ export default function Reports(){
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h1 className="text-2xl font-bold">Reports</h1><p className="text-sm text-gray-500">Filter by date, see breakdown, export CSV for tax season.</p></div>
-        <Button onClick={handleExport}>⬇ Export CSV</Button>
+        <Button onClick={handleExport} disabled={isInvalidRange}>⬇ Export CSV</Button>
       </div>
 
       <Card className="p-5 flex flex-wrap gap-4 items-end">
-        <div><Label>From</Label><Input type="date" value={from} onChange={e=>setFrom(e.target.value)} /></div>
-        <div><Label>To</Label><Input type="date" value={to} onChange={e=>setTo(e.target.value)} /></div>
+        <div><Label>From</Label><Input type="date" value={from} onChange={e=>setFrom(e.target.value)} max={to} /></div>
+        <div><Label>To</Label><Input type="date" value={to} onChange={e=>setTo(e.target.value)} min={from} /></div>
         <div className="text-xs text-gray-500 pb-2">Showing {filtered.income.length} income + {filtered.expenses.length} expenses</div>
       </Card>
+      {isInvalidRange && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">The start date must be earlier than or equal to the end date.</div>}
 
       <div className="grid md:grid-cols-3 gap-4">
         <Card className="p-5"><div className="text-xs uppercase tracking-wide font-bold text-teal-700">Total income</div><div className="text-2xl font-bold mt-1">{formatCurrency(filtered.totalIncome, data.settings.currency)}</div></Card>

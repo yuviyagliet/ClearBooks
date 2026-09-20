@@ -12,6 +12,7 @@ import ClientsPage from './pages/Clients'
 import InvoicesPage from './pages/Invoices'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
+import NotFound from './pages/NotFound'
 
 function Protected({ children }){
   const { user, loading } = useAuth()
@@ -45,7 +46,7 @@ export default function App(){
             <Route path="/invoices" element={<Protected><InvoicesPage /></Protected>} />
             <Route path="/reports" element={<Protected><Reports /></Protected>} />
             <Route path="/settings" element={<Protected><Settings /></Protected>} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
         <Analytics />

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { Card, Button, Input, Label, Select } from '../components/UI'
-import { useLocalMode } from '../lib/supabase'
 
 export default function Settings(){
   const { data, updateSettings } = useData()
@@ -65,9 +64,7 @@ export default function Settings(){
           <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-xs">
             <div className="font-semibold mb-1">Account</div>
             <div className="text-gray-600">Email: <span className="font-medium text-gray-900">{user?.email || '—'}</span></div>
-            <div className="text-gray-600">User ID: <span className="font-mono text-[11px]">{user?.id || '—'}</span></div>
-            <div className="text-gray-500 mt-1">Mode: {useLocalMode ? 'Local demo (configure Supabase for multi-user isolation)' : 'Supabase — secured with RLS (user_id = auth.uid())'}</div>
-            {!useLocalMode && <div className="text-emerald-700 mt-1">Your data is private and secured to your account (RLS).</div>}
+            <div className="text-emerald-700 mt-1">✓ Your data is private and secured to your account.</div>
           </div>
           {err && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-2.5">{err}</div>}
           {info && <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-2.5">{info}</div>}

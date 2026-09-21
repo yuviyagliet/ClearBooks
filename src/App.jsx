@@ -13,6 +13,7 @@ import InvoicesPage from './pages/Invoices'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
+import { Privacy, Terms, Security } from './pages/StaticPages'
 
 function Protected({ children }){
   const { user, loading } = useAuth()
@@ -35,6 +36,9 @@ export default function App(){
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Landing />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/security" element={<Security />} />
             <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
             <Route path="/signup" element={<PublicOnly><Signup /></PublicOnly>} />
             <Route path="/forgot-password" element={<PublicOnly><ForgotPassword /></PublicOnly>} />

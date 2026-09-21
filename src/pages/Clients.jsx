@@ -13,6 +13,13 @@ export default function ClientsPage(){
   const [editing,setEditing]=useState(null)
   const [err,setErr]=useState('')
   const [info,setInfo]=useState('')
+  const [search,setSearch]=useState('')
+
+  const visibleClients = data.clients.filter(c=>{
+    const q = search.trim().toLowerCase()
+    if (!q) return true
+    return (c.name||'').toLowerCase().includes(q) || (c.company||'').toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q)
+  })
   const [expanded,setExpanded]=useState(null)
 
   // Per-client totals from invoices
@@ -75,8 +82,16 @@ export default function ClientsPage(){
       </Card>
 
       {data.clients.length===0 ? <Empty title="No clients yet" desc="Add your first client to use when creating invoices." /> :
+        <>
+        {data.clients.length > 1 && (
+          <div className="flex gap-2 items-center">
+            <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search clients…" className="max-w-xs" />
+            {search && <span className="text-xs text-gray-500">{visibleClients.length} of {data.clients.length}</span>}
+          </div>
+        )}
+        {visibleClients.length===0 ? <p className="text-sm text-gray-500">No clients match your search.</p> :
         <div className="grid md:grid-cols-2 gap-4">
-          {data.clients.map(c=>{
+          {visibleClients.map(c=>{
             const s = stats[c.id] || { billed: 0, paid: 0, outstanding: 0, invoices: [], lastPayment: null }
             const open = expanded === c.id
             return (
@@ -135,7 +150,8 @@ export default function ClientsPage(){
               </Card>
             )
           })}
-        </div>
+        </div>}
+        </>
       }
     </div>
   )

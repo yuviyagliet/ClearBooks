@@ -2,13 +2,13 @@ import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { Card, Button, Input, Select, Label, Empty } from '../components/UI'
-import { formatCurrency } from '../utils/helpers'
+import { formatCurrency, TAX_TYPES, taxLabel } from '../utils/helpers'
 import { getPayments, amountPaid, amountOutstanding, invoiceStatus, statusBadgeClass, outstandingSummary } from '../utils/payments'
 import jsPDF from 'jspdf'
 
 export default function InvoicesPage(){
   const { data, addInvoice, updateInvoice, deleteInvoice, recordPayment, markPaid, markSent, addClient } = useData()
-  const [form,setForm]=useState({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', tax_rate: data.settings.default_tax_rate ?? 18, line_items:[{description:'', quantity:1, rate:0}]})
+  const [form,setForm]=useState({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', tax_type: data.settings.default_tax_type || 'none', tax_rate: data.settings.default_tax_rate ?? 0, line_items:[{description:'', quantity:1, rate:0}]})
   const [editing,setEditing]=useState(null)
   const [err,setErr]=useState('')
   const [info,setInfo]=useState('')
@@ -16,13 +16,26 @@ export default function InvoicesPage(){
   const [showNewClient,setShowNewClient]=useState(false)
   const [payFor,setPayFor]=useState(null) // invoice id with payment form open
   const [payForm,setPayForm]=useState({ amount:'', date:new Date().toISOString().slice(0,10), note:'' })
+  const [search,setSearch]=useState('')
+  const [statusFilter,setStatusFilter]=useState('All')
 
-  // Keep tax_rate in sync with settings default for new invoices (not when editing)
+  const visibleInvoices = useMemo(()=>{
+    const q = search.trim().toLowerCase()
+    return [...data.invoices]
+      .filter(inv=>{
+        if (statusFilter !== 'All' && invoiceStatus(inv) !== statusFilter && !(statusFilter==='Overdue' && invoiceStatus(inv)==='Overdue (partial)')) return false
+        if (!q) return true
+        return (inv.invoice_number||'').toLowerCase().includes(q) || (inv.client_name||'').toLowerCase().includes(q)
+      })
+      .sort((a,b)=> b.invoice_number.localeCompare(a.invoice_number))
+  }, [data.invoices, search, statusFilter])
+
+  // Keep tax defaults in sync with settings for new invoices (not when editing)
   useEffect(()=>{
-    if (!editing) setForm(f=> ({ ...f, tax_rate: data.settings.default_tax_rate ?? 18 }))
-  }, [data.settings.default_tax_rate, editing])
+    if (!editing) setForm(f=> ({ ...f, tax_type: data.settings.default_tax_type || 'none', tax_rate: data.settings.default_tax_rate ?? 0 }))
+  }, [data.settings.default_tax_rate, data.settings.default_tax_type, editing])
   const subtotal = useMemo(()=> form.line_items.reduce((s,l)=> s + (Number(l.quantity)||0)*(Number(l.rate)||0),0), [form.line_items])
-  const tax_rate_num = Number(form.tax_rate) || 0
+  const tax_rate_num = (form.tax_type === 'none' || form.tax_type === 'exempt') ? 0 : (Number(form.tax_rate) || 0)
   const tax_amount = useMemo(()=> Number((subtotal * tax_rate_num / 100).toFixed(2)), [subtotal, tax_rate_num])
   const total = useMemo(()=> Number((subtotal + tax_amount).toFixed(2)), [subtotal, tax_amount])
   const addLine=()=> setForm({...form, line_items:[...form.line_items,{description:'',quantity:1,rate:0}]})
@@ -51,6 +64,7 @@ export default function InvoicesPage(){
       issue_date: form.issue_date,
       due_date: form.due_date,
       status: form.status,
+      tax_type: form.tax_type || 'none',
       tax_rate: tax_rate_num,
       subtotal,
       tax_amount,
@@ -61,7 +75,7 @@ export default function InvoicesPage(){
       if(editing) await updateInvoice(editing, payload)
       else await addInvoice(payload)
       setInfo(editing ? 'Invoice updated!' : `Invoice created! ${payload.invoice_number||''}`)
-      setForm({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', tax_rate: data.settings.default_tax_rate ?? 18, line_items:[{description:'', quantity:1, rate:0}]}); setEditing(null)
+      setForm({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', tax_type: data.settings.default_tax_type || 'none', tax_rate: data.settings.default_tax_rate ?? 0, line_items:[{description:'', quantity:1, rate:0}]}); setEditing(null)
       setTimeout(()=> setInfo(''), 3000)
     }catch(ex){ setErr(ex.message) }
   }
@@ -75,7 +89,7 @@ export default function InvoicesPage(){
     }catch(ex){ setErr(ex.message) }
   }
   const startEdit=(inv)=>{
-    setEditing(inv.id); setForm({ client_id:inv.client_id||'', issue_date:inv.issue_date, due_date:inv.due_date, status:inv.status === 'Paid' ? 'Paid' : 'Unpaid', tax_rate: inv.tax_rate ?? 0, line_items: inv.line_items?.length? inv.line_items: [{description:'',quantity:1,rate:0}]})
+    setEditing(inv.id); setForm({ client_id:inv.client_id||'', issue_date:inv.issue_date, due_date:inv.due_date, status:inv.status === 'Paid' ? 'Paid' : 'Unpaid', tax_type: inv.tax_type || (inv.tax_rate > 0 ? 'custom' : 'none'), tax_rate: inv.tax_rate ?? 0, line_items: inv.line_items?.length? inv.line_items: [{description:'',quantity:1,rate:0}]})
     setErr(''); window.scrollTo({top:0,behavior:'smooth'})
   }
 
@@ -171,11 +185,12 @@ export default function InvoicesPage(){
     y+=4; doc.line(14,y,196,y)
     y+=8; doc.setFont('helvetica','normal'); doc.setFontSize(10)
     const rate = Number(inv.tax_rate ?? 0)
+    const ttype = inv.tax_type || (rate > 0 ? 'custom' : 'none')
     const grand = Number(inv.total_amount)
     const sub = Number(inv.subtotal ?? (rate ? grand / (1 + rate/100) : grand))
     const tax = Number(inv.tax_amount ?? (sub * rate / 100))
     doc.text(`Subtotal: ${currency}${sub.toFixed(2)}`, 150, y)
-    y+=6; doc.text(`GST/VAT (${rate}%): ${currency}${tax.toFixed(2)}`, 150, y)
+    y+=6; doc.text(`${taxLabel(ttype, rate)}: ${currency}${tax.toFixed(2)}`, 150, y)
     y+=6; doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.text(`Total: ${currency}${grand.toFixed(2)}`, 150, y)
     if (paid > 0) { y+=6; doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.text(`Paid: ${currency}${paid.toFixed(2)}`, 150, y) }
     if (bal > 0 && paid > 0) { y+=6; doc.text(`Still owed: ${currency}${bal.toFixed(2)}`, 150, y) }
@@ -218,12 +233,13 @@ export default function InvoicesPage(){
             <div><Label htmlFor="invoice-issue">Issue date *</Label><Input id="invoice-issue" type="date" value={form.issue_date} onChange={e=>setForm({...form, issue_date:e.target.value})} required /></div>
             <div><Label htmlFor="invoice-due">Due date *</Label><Input id="invoice-due" type="date" value={form.due_date} onChange={e=>setForm({...form, due_date:e.target.value})} required /></div>
           </div>
-          <div className="grid md:grid-cols-2 gap-4 max-w-lg">
+          <div className="grid md:grid-cols-3 gap-4 max-w-2xl">
             <div><Label htmlFor="invoice-status">Status</Label><Select id="invoice-status" value={form.status} onChange={e=>setForm({...form, status:e.target.value})}><option>Unpaid</option><option>Paid</option><option>Overdue</option></Select></div>
-            <div><Label htmlFor="invoice-tax">GST/VAT Rate (%) *</Label><Input id="invoice-tax" type="number" min="0" max="100" step="0.01" value={form.tax_rate} onChange={e=>setForm({...form, tax_rate: e.target.value})} required />
-              <p className="text-[11px] text-gray-400 mt-1">Snapshotted per invoice — changing default later won’t affect this invoice.</p>
+            <div><Label htmlFor="invoice-tax-type">Tax</Label><Select id="invoice-tax-type" value={form.tax_type} onChange={e=>setForm({...form, tax_type: e.target.value})}><option value="none">No tax</option><option value="gst">GST</option><option value="vat">VAT</option><option value="custom">Custom</option><option value="exempt">Tax exempt</option></Select></div>
+            <div><Label htmlFor="invoice-tax">Rate (%) *</Label><Input id="invoice-tax" type="number" min="0" max="100" step="0.01" value={form.tax_type==='none'||form.tax_type==='exempt' ? 0 : form.tax_rate} onChange={e=>setForm({...form, tax_rate: e.target.value})} required disabled={form.tax_type==='none'||form.tax_type==='exempt'} />
             </div>
           </div>
+          <p className="text-[11px] text-gray-400 -mt-2">Tax type and rate are snapshotted per invoice — changing defaults later won’t affect this invoice. Rules vary by country; pick what applies.</p>
 
           <div>
             <div className="flex items-center justify-between mb-2"><Label>Line items *</Label><Button type="button" variant="ghost" onClick={addLine} className="text-xs py-1.5">＋ Add line</Button></div>
@@ -240,9 +256,9 @@ export default function InvoicesPage(){
             </div>
             <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 mt-3 space-y-1 text-sm">
               <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(subtotal, data.settings.currency)}</span></div>
-              <div className="flex justify-between"><span>GST/VAT ({tax_rate_num}%)</span><span>{formatCurrency(tax_amount, data.settings.currency)}</span></div>
+              <div className="flex justify-between"><span>{taxLabel(form.tax_type, tax_rate_num)}</span><span>{formatCurrency(tax_amount, data.settings.currency)}</span></div>
               <div className="flex justify-between font-bold text-lg border-t pt-1"><span>Total</span><span>{formatCurrency(total, data.settings.currency)}</span></div>
-              <p className="text-[11px] text-gray-400">Tax rate is snapshotted — yearly reports use each invoice’s own rate.</p>
+              <p className="text-[11px] text-gray-400">Tax type and rate are snapshotted — yearly reports use each invoice’s own values.</p>
             </div>
           </div>
 
@@ -251,27 +267,37 @@ export default function InvoicesPage(){
 
           <div className="flex gap-2">
             <Button type="submit">{editing?'Update invoice':'Create invoice'}</Button>
-            {editing && <Button type="button" variant="ghost" onClick={()=>{setEditing(null); setForm({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', tax_rate: data.settings.default_tax_rate ?? 18, line_items:[{description:'', quantity:1, rate:0}]}); setErr('')}}>Cancel</Button>}
+            {editing && <Button type="button" variant="ghost" onClick={()=>{setEditing(null); setForm({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', tax_type: data.settings.default_tax_type || 'none', tax_rate: data.settings.default_tax_rate ?? 0, line_items:[{description:'', quantity:1, rate:0}]}); setErr('')}}>Cancel</Button>}
           </div>
         </form>
       </Card>
 
       {data.invoices.length===0 ? <Empty title="No invoices yet" desc="Create your first invoice — it auto-numbers and exports to PDF." /> :
         <Card className="overflow-hidden">
+          <div className="flex flex-wrap gap-2 p-4 border-b border-gray-100 bg-gray-50/50">
+            <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search number or client…" className="!w-56" />
+            <Select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} className="!w-auto text-sm">
+              <option>All</option><option>Unpaid</option><option>Sent</option><option>Due soon</option><option>Partial</option><option>Overdue</option><option>Paid</option>
+            </Select>
+            {(search || statusFilter!=='All') && <span className="text-xs text-gray-500 self-center">{visibleInvoices.length} of {data.invoices.length}</span>}
+          </div>
+          {visibleInvoices.length===0 ? <p className="text-sm text-gray-500 p-6 text-center">No invoices match your search.</p> :
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="text-left px-4 py-3">Number</th><th className="text-left px-4 py-3">Client</th><th className="text-left px-4 py-3">Dates</th><th className="text-right px-4 py-3">Paid / Total</th><th className="text-center px-4 py-3">Status</th><th className="px-4 py-3"></th></tr></thead>
               <tbody className="divide-y divide-gray-100">
-                {[...data.invoices].sort((a,b)=> b.invoice_number.localeCompare(a.invoice_number)).map(inv=>{
+                {visibleInvoices.map(inv=>{
                   const s = invoiceStatus(inv)
                   const paid = amountPaid(inv)
                   const bal = amountOutstanding(inv)
                   const pays = getPayments(inv)
+                  const rate = Number(inv.tax_rate ?? 0)
+                  const ttype = inv.tax_type || (rate > 0 ? 'custom' : 'none')
                   return (
                     <tr key={inv.id} className="hover:bg-gray-50/50 align-top">
                       <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap">{inv.invoice_number}{inv.sent_at && <div className="text-[10px] text-gray-400 font-normal">Sent</div>}</td>
                       <td className="px-4 py-3">{inv.client_name}</td>
-                      <td className="px-4 py-3 text-xs leading-tight whitespace-nowrap">{inv.issue_date} → {inv.due_date}{inv.payment_date && <div className="text-emerald-600">Paid {inv.payment_date}</div>}</td>
+                      <td className="px-4 py-3 text-xs leading-tight whitespace-nowrap">{inv.issue_date} → {inv.due_date}{inv.payment_date && <div className="text-emerald-600">Paid {inv.payment_date}</div>}<div className="text-gray-400">{taxLabel(ttype, rate)}</div></td>
                       <td className="px-4 py-3 text-right whitespace-nowrap"><span className="font-semibold">{formatCurrency(inv.total_amount, data.settings.currency)}</span>{paid>0 && <div className="text-[11px] text-gray-500">Paid {formatCurrency(paid, data.settings.currency)}{bal>0 && ` · Owes ${formatCurrency(bal, data.settings.currency)}`}</div>}</td>
                       <td className="px-4 py-3 text-center whitespace-nowrap">{badge(s)}</td>
                       <td className="px-4 py-3">
@@ -305,7 +331,7 @@ export default function InvoicesPage(){
                 })}
               </tbody>
             </table>
-          </div>
+          </div>}
         </Card>
       }
     </div>

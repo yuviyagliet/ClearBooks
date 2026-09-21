@@ -79,16 +79,17 @@ export default function Dashboard(){
   const maxVal = Math.max(1, ...chartData.flatMap(d=>[d.inc,d.exp]))
 
   const handleExportAll = ()=>{
-    const rows = [['Type','Date','Invoice Number','Client','Category','Description','Amount','Tax Rate %','Tax Amount','Total','Paid','Outstanding','Currency','Status']]
-    data.income.forEach(i=> rows.push(['Income', i.date, '', i.client_name||'', '', i.description||'', i.amount, '', '', '', '', '', data.settings.currency, '']))
-    data.expenses.forEach(e=> rows.push(['Expense', e.date, '', '', e.category||'', e.description||'', e.amount, '', '', '', '', '', data.settings.currency, '']))
+    const rows = [['Type','Date','Invoice Number','Client','Category','Description','Amount','Tax Type','Tax Rate %','Tax Amount','Total','Paid','Outstanding','Currency','Status']]
+    data.income.forEach(i=> rows.push(['Income', i.date, '', i.client_name||'', '', i.description||'', i.amount, '', '', '', '', '', '', data.settings.currency, '']))
+    data.expenses.forEach(e=> rows.push(['Expense', e.date, '', '', e.category||'', e.description||'', e.amount, '', '', '', '', '', '', data.settings.currency, '']))
     data.invoices.forEach(inv=>{
       const rate = Number(inv.tax_rate ?? 0)
+      const ttype = inv.tax_type || (rate > 0 ? 'custom' : 'none')
       const grand = Number(inv.total_amount || 0)
       const sub = Number(inv.subtotal ?? (rate ? grand / (1 + rate/100) : grand))
       const tax = Number(inv.tax_amount ?? (sub * rate / 100))
       const paid = (Array.isArray(inv.payments) ? inv.payments : []).reduce((s,p)=> s + (Number(p.amount)||0), 0)
-      rows.push(['Invoice', inv.issue_date, inv.invoice_number, inv.client_name||'', '', (inv.line_items||[]).map(l=>l.description).join('; '), sub, rate, tax, grand, paid, grand - paid, data.settings.currency, inv.status])
+      rows.push(['Invoice', inv.issue_date, inv.invoice_number, inv.client_name||'', '', (inv.line_items||[]).map(l=>l.description).join('; '), sub, ttype, rate, tax, grand, paid, grand - paid, data.settings.currency, inv.status])
     })
     const date = new Date().toISOString().slice(0,10)
     exportCSV(`clearbooks-export-${date}.csv`, rows)

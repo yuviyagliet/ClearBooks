@@ -75,6 +75,7 @@ create table if not exists public.invoices (
   line_items jsonb not null default '[]'::jsonb,
   total_amount numeric not null check (total_amount > 0),
   tax_rate numeric not null default 0 check (tax_rate >= 0 and tax_rate <= 100),
+  tax_type text not null default 'none' check (tax_type in ('none','gst','vat','custom','exempt')),
   payments jsonb not null default '[]'::jsonb,
   payment_date date,
   sent_at timestamp with time zone,
@@ -84,6 +85,7 @@ create table if not exists public.invoices (
 alter table public.invoices add column if not exists payment_date date;
 alter table public.invoices add column if not exists sent_at timestamp with time zone;
 alter table public.invoices add column if not exists payments jsonb not null default '[]'::jsonb;
+alter table public.invoices add column if not exists tax_type text not null default 'none' check (tax_type in ('none','gst','vat','custom','exempt'));
 -- Migration: add tax_rate if table already existed without it
 alter table public.invoices add column if not exists tax_rate numeric not null default 0 check (tax_rate >= 0 and tax_rate <= 100);
 alter table public.invoices add column if not exists subtotal numeric check (subtotal >= 0);

@@ -2,14 +2,29 @@ import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
+// Minimal geometric SVG icons (no emoji) — consistent stroke style
+function NavIcon({ name, className = 'w-5 h-5' }){
+  const common = { className, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', viewBox: '0 0 24 24' }
+  switch(name){
+    case 'dashboard': return <svg {...common}><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>
+    case 'income': return <svg {...common}><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>
+    case 'expenses': return <svg {...common}><path d="M3 7l6 6 4-4 8 8"/><path d="M15 17h6v-6"/></svg>
+    case 'clients': return <svg {...common}><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 15.2c2.4.3 4.5 1.9 5.5 4.8"/></svg>
+    case 'invoices': return <svg {...common}><path d="M6 2.5h8L19 8v13.5a.5.5 0 0 1-.5.5h-12a.5.5 0 0 1-.5-.5z"/><path d="M13.5 2.5V8H19"/><path d="M9 12.5h6M9 16h6"/></svg>
+    case 'reports': return <svg {...common}><path d="M4 20V10M10 20V4M16 20v-8M21 20H3"/></svg>
+    case 'settings': return <svg {...common}><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.7a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.7h4l.4-2.7a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></svg>
+    default: return null
+  }
+}
+
 const nav = [
-  { to:'/dashboard', label:'Dashboard', icon:'▦' },
-  { to:'/income', label:'Income', icon:'↗' },
-  { to:'/expenses', label:'Expenses', icon:'↘' },
-  { to:'/clients', label:'Clients', icon:'👥' },
-  { to:'/invoices', label:'Invoices', icon:'📄' },
-  { to:'/reports', label:'Reports', icon:'📊' },
-  { to:'/settings', label:'Settings', icon:'⚙' },
+  { to:'/dashboard', label:'Dashboard', icon:'dashboard' },
+  { to:'/income', label:'Income', icon:'income' },
+  { to:'/expenses', label:'Expenses', icon:'expenses' },
+  { to:'/clients', label:'Clients', icon:'clients' },
+  { to:'/invoices', label:'Invoices', icon:'invoices' },
+  { to:'/reports', label:'Reports', icon:'reports' },
+  { to:'/settings', label:'Settings', icon:'settings' },
 ]
 
 export default function Layout({ children }){
@@ -34,7 +49,7 @@ export default function Layout({ children }){
         <nav className="flex-1 p-3 space-y-1 overflow-auto">
           {nav.map(n=>(
             <NavLink key={n.to} to={n.to} className={({isActive})=> `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition ${isActive?'bg-teal-700 text-white':'text-gray-600 hover:bg-gray-100'}`}>
-              <span className="w-6 text-center">{n.icon}</span>{n.label}
+              <NavIcon name={n.icon} className="w-5 h-5 shrink-0" />{n.label}
             </NavLink>
           ))}
         </nav>
@@ -64,7 +79,7 @@ export default function Layout({ children }){
         <div className="flex justify-around items-center py-1">
           {primaryNav.map(n=>(
             <NavLink key={n.to} to={n.to} className={({isActive})=> `flex flex-col items-center gap-1 px-3 py-2 text-[10px] font-medium ${isActive?'text-teal-700':'text-gray-500'}`}>
-              <span className="text-base leading-none">{n.icon}</span>{n.label}
+              <NavIcon name={n.icon} className="w-5 h-5" />{n.label}
             </NavLink>
           ))}
           <div className="relative">
@@ -75,7 +90,7 @@ export default function Layout({ children }){
               <div className="absolute bottom-full right-0 mb-2 w-44 bg-white border border-gray-200 rounded-xl shadow-lg py-1">
                 {secondaryNav.map(n=>(
                   <NavLink key={n.to} to={n.to} onClick={()=>setShowMore(false)} className={({isActive})=> `flex items-center gap-2 px-4 py-2.5 text-sm ${isActive?'bg-teal-50 text-teal-700':'text-gray-700 hover:bg-gray-50'}`}>
-                    <span>{n.icon}</span>{n.label}
+                    <NavIcon name={n.icon} className="w-4 h-4" />{n.label}
                   </NavLink>
                 ))}
                 <button onClick={handleOut} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-gray-50">Logout</button>

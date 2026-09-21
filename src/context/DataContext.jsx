@@ -8,7 +8,7 @@ const DataContext = createContext(null)
 
 export function DataProvider({ children }) {
   const { user } = useAuth()
-  const [data, setData] = useState(() => useLocalMode ? loadLocal() : { clients:[], income:[], expenses:[], invoices:[], settings:{name:'', business_name:'', currency:'$', default_tax_rate:18}, invoice_counter:1001 })
+  const [data, setData] = useState(() => useLocalMode ? loadLocal() : { clients:[], income:[], expenses:[], invoices:[], settings:{name:'', business_name:'', currency:'$', default_tax_rate:0, default_tax_type:'none'}, invoice_counter:1001 })
   const [loading, setLoading] = useState(!useLocalMode)
   const [error, setError] = useState(null)
 
@@ -24,7 +24,7 @@ export function DataProvider({ children }) {
       return
     }
     if (!user) { 
-      setData({ clients:[], income:[], expenses:[], invoices:[], settings:{name:'', business_name:'', currency:'$', default_tax_rate:18}, invoice_counter:1001 })
+      setData({ clients:[], income:[], expenses:[], invoices:[], settings:{name:'', business_name:'', currency:'$', default_tax_rate:0, default_tax_type:'none'}, invoice_counter:1001 })
       setLoading(false); return 
     }
     setLoading(true)
@@ -42,25 +42,27 @@ export function DataProvider({ children }) {
       if (expenses.error) throw expenses.error
       if (invoices.error) throw invoices.error
 
-      const savedSettings = JSON.parse(localStorage.getItem('clearbooks_settings') || 'null') || { name: user.email?.split('@')[0]||'', business_name:'', currency:'$', default_tax_rate:18 }
-      if (savedSettings.default_tax_rate == null) savedSettings.default_tax_rate = 18
+      const savedSettings = JSON.parse(localStorage.getItem('clearbooks_settings') || 'null') || { name: user.email?.split('@')[0]||'', business_name:'', currency:'$', default_tax_rate:0, default_tax_type:'none' }
+      // Existing users keep their stored rate; only brand-new users default to No tax (0%)
+      if (savedSettings.default_tax_rate == null) savedSettings.default_tax_rate = 0
+      if (savedSettings.default_tax_type == null) savedSettings.default_tax_type = 'none'
       const invCounter = invoices.data?.length ? Math.max(...invoices.data.map(i=> parseInt(String(i.invoice_number).replace(/\D/g,''))||1000))+1 : 1001
 
-      // Backfill tax_rate for old invoices missing it
+      // Backfill tax_rate/tax_type for old invoices missing them (0% keeps old totals intact)
       let invoicesData = invoices.data || []
-      let needsBackfill = invoicesData.some(inv => inv.tax_rate == null)
+      let needsBackfill = invoicesData.some(inv => inv.tax_rate == null || inv.tax_type == null)
       if (needsBackfill) {
-        console.warn('Backfilling invoices missing tax_rate with default', savedSettings.default_tax_rate, '— historical data may need manual review.')
+        console.warn('Backfilling invoices missing tax_rate/tax_type with 0% No tax — historical data may need manual review.')
         // Update in DB in background (best effort, RLS ensures only own rows)
         const toBackfill = invoicesData.filter(inv => inv.tax_rate == null).map(inv => inv.id)
         if (toBackfill.length) {
           // fire and forget; don't block UI
-          supabase.from('invoices').update({ tax_rate: savedSettings.default_tax_rate }).in('id', toBackfill).then(({error})=>{
+          supabase.from('invoices').update({ tax_rate: 0, tax_type: 'none' }).in('id', toBackfill).then(({error})=>{
             if (error) console.error('Backfill tax_rate failed', error)
-            else console.info('Backfilled', toBackfill.length, 'invoices with tax_rate', savedSettings.default_tax_rate)
+            else console.info('Backfilled', toBackfill.length, 'invoices with 0% No tax')
           })
         }
-        invoicesData = invoicesData.map(inv => inv.tax_rate == null ? { ...inv, tax_rate: savedSettings.default_tax_rate, _taxMigrated: true } : inv)
+        invoicesData = invoicesData.map(inv => (inv.tax_rate == null || inv.tax_type == null) ? { ...inv, tax_rate: inv.tax_rate ?? 0, tax_type: inv.tax_type ?? (inv.tax_rate > 0 ? 'custom' : 'none'), _taxMigrated: true } : inv)
       }
 
       // Normalize payments array so UI never breaks on older rows/DBs
@@ -205,13 +207,16 @@ export function DataProvider({ children }) {
     if (!payload.issue_date || !payload.due_date) throw new Error('Issue and due dates are required')
     if (!payload.line_items?.length || payload.line_items.some(l=> !l.description?.trim() || Number(l.quantity) <=0 || Number(l.rate) <=0)) throw new Error('Each line item needs description, quantity >0 and rate >0')
     if (payload.total_amount <=0) throw new Error('Invoice total must be positive (rate must be >0)')
-    // Snapshot tax_rate — never read from settings at report time
-    const tax_rate = Number(payload.tax_rate ?? data.settings.default_tax_rate ?? 0)
+    // Snapshot tax type + rate — never read from settings at report time
+    const validTypes = ['none','gst','vat','custom','exempt']
+    const tax_type = validTypes.includes(payload.tax_type) ? payload.tax_type : 'none'
+    let tax_rate = Number(payload.tax_rate ?? data.settings.default_tax_rate ?? 0)
+    if (tax_type === 'none' || tax_type === 'exempt') tax_rate = 0
     if (isNaN(tax_rate) || tax_rate <0 || tax_rate >100) throw new Error('Tax rate must be 0-100')
     const subtotal = Number(payload.subtotal ?? payload.total_amount)
     const tax_amount = Number((subtotal * tax_rate / 100).toFixed(2))
     const grand_total = Number((subtotal + tax_amount).toFixed(2))
-    const toSave = { ...payload, tax_rate, subtotal, tax_amount, total_amount: grand_total, payments: payload.payments ?? [] }
+    const toSave = { ...payload, tax_type, tax_rate, subtotal, tax_amount, total_amount: grand_total, payments: payload.payments ?? [] }
     const wasFirstInvoice = data.invoices.length === 0
     const uid = user?.id || 'anon'
     if(useLocalMode){

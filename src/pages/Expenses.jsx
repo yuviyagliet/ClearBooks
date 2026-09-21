@@ -14,6 +14,13 @@ export default function ExpensesPage(){
   const [categories, setCategories]=useState(EXPENSE_CATEGORIES)
   const [err, setErr]=useState('')
   const [info, setInfo]=useState('')
+  const [search,setSearch]=useState('')
+
+  const visibleExpenses = [...data.expenses].filter(e=>{
+    const q = search.trim().toLowerCase()
+    if (!q) return true
+    return (e.description||'').toLowerCase().includes(q) || (e.category||'').toLowerCase().includes(q)
+  }).sort((a,b)=>b.date.localeCompare(a.date))
 
   const submit= async(e)=>{
     e.preventDefault()
@@ -108,11 +115,17 @@ export default function ExpensesPage(){
 
       {data.expenses.length===0 ? <Empty title="No expenses yet" desc="Add your first expense — with a receipt if you want." /> :
         <Card className="overflow-hidden">
+          {data.expenses.length > 3 && (
+            <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+              <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search description or category…" className="max-w-xs" />
+            </div>
+          )}
+          {visibleExpenses.length===0 ? <p className="text-sm text-gray-500 p-6 text-center">No expenses match your search.</p> :
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="text-left px-4 py-3">Date</th><th className="text-left px-4 py-3">Category</th><th className="text-left px-4 py-3">Description</th><th className="text-right px-4 py-3">Amount</th><th className="text-center px-4 py-3">Receipt</th><th className="px-4 py-3"></th></tr></thead>
               <tbody className="divide-y divide-gray-100">
-                {[...data.expenses].sort((a,b)=>b.date.localeCompare(a.date)).map(row=>(
+                {visibleExpenses.map(row=>(
                   <tr key={row.id} className="hover:bg-gray-50/50">
                     <td className="px-4 py-3 whitespace-nowrap">{row.date}</td>
                     <td className="px-4 py-3"><span className="bg-gray-100 border border-gray-200 rounded-full px-2.5 py-1 text-xs">{row.category}</span></td>
@@ -127,7 +140,7 @@ export default function ExpensesPage(){
                 ))}
               </tbody>
             </table>
-          </div>
+          </div>}
         </Card>
       }
     </div>

@@ -17,7 +17,7 @@ const defaultData = {
   invoices: [
     { id: 'inv1', invoice_number: 'INV-1001', client_id: 'c1', client_name: 'Acme Co', issue_date: new Date().toISOString().slice(0,10), due_date: new Date(Date.now()+7*24*3600*1000).toISOString().slice(0,10), status: 'Unpaid', line_items: [{description:'Design', quantity:1, rate:2500, total:2500}], total_amount: 2500, tax_rate: 0, subtotal: 2500, tax_amount: 0 },
   ],
-  settings: { name: 'Alex Freelancer', business_name: 'Alex Studio', currency: '$', default_tax_rate: 18 },
+  settings: { name: 'Alex Freelancer', business_name: 'Alex Studio', currency: '$', default_tax_rate: 0, default_tax_type: 'none' },
   invoice_counter: 1002,
 }
 
@@ -29,18 +29,28 @@ export function loadLocal() {
       return structuredClone(defaultData)
     }
     const parsed = JSON.parse(raw)
-    // Migration: backfill tax_rate for old invoices + default_tax_rate for settings
+    // Migration: backfill tax_rate/tax_type for old invoices + defaults for settings
+    // NOTE: existing users keep their stored default_tax_rate (e.g. 18). Only brand-new
+    // users get No tax (0%) — rates vary by jurisdiction, so 18% is not a universal default.
     let migrated = false
     if (parsed.settings && parsed.settings.default_tax_rate == null) {
-      parsed.settings.default_tax_rate = 18
+      parsed.settings.default_tax_rate = 0
+      migrated = true
+    }
+    if (parsed.settings && parsed.settings.default_tax_type == null) {
+      parsed.settings.default_tax_type = 'none'
       migrated = true
     }
     if (Array.isArray(parsed.invoices)) {
       parsed.invoices.forEach(inv => {
         if (inv.tax_rate == null) {
-          inv.tax_rate = parsed.settings?.default_tax_rate ?? 18
+          inv.tax_rate = 0
           // flag for review
           inv._taxMigrated = true
+          migrated = true
+        }
+        if (inv.tax_type == null) {
+          inv.tax_type = inv.tax_rate > 0 ? 'custom' : 'none'
           migrated = true
         }
         // ensure subtotal/tax_amount exist for display

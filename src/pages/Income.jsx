@@ -14,6 +14,13 @@ export default function IncomePage(){
   const [showNewClient, setShowNewClient] = useState(false)
   const [err,setErr]=useState('')
   const [info,setInfo]=useState('')
+  const [search,setSearch]=useState('')
+
+  const visibleIncome = [...data.income].filter(i=>{
+    const q = search.trim().toLowerCase()
+    if (!q) return true
+    return (i.description||'').toLowerCase().includes(q) || (i.client_name||'').toLowerCase().includes(q)
+  }).sort((a,b)=>b.date.localeCompare(a.date))
 
   useEffect(()=>{
     if (isOnboarding) {
@@ -96,11 +103,17 @@ export default function IncomePage(){
 
       {data.income.length===0 ? <Empty title="No income yet" desc="Add your first payment to see it here." /> :
         <Card className="overflow-hidden">
+          {data.income.length > 3 && (
+            <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+              <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search description or client…" className="max-w-xs" />
+            </div>
+          )}
+          {visibleIncome.length===0 ? <p className="text-sm text-gray-500 p-6 text-center">No income matches your search.</p> :
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="text-left px-4 py-3">Date</th><th className="text-left px-4 py-3">Client</th><th className="text-left px-4 py-3">Description</th><th className="text-right px-4 py-3">Amount</th><th className="px-4 py-3"></th></tr></thead>
               <tbody className="divide-y divide-gray-100">
-                {[...data.income].sort((a,b)=>b.date.localeCompare(a.date)).map(row=>(
+                {visibleIncome.map(row=>(
                   <tr key={row.id} className="hover:bg-gray-50/50">
                     <td className="px-4 py-3 whitespace-nowrap">{row.date}</td>
                     <td className="px-4 py-3">{row.client_name||'—'}</td>
@@ -114,7 +127,7 @@ export default function IncomePage(){
                 ))}
               </tbody>
             </table>
-          </div>
+          </div>}
         </Card>
       }
     </div>

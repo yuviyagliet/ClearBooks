@@ -27,8 +27,8 @@ export default function Landing(){
       <section className="max-w-6xl mx-auto px-6 pt-10 md:pt-16 pb-10 grid md:grid-cols-2 gap-10 items-center">
         <div>
           <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-wide uppercase bg-teal-50 text-teal-700 border border-teal-100 rounded-full px-3 py-1">No bloat. Just money in & out.</div>
-          <h1 className="text-4xl md:text-[42px] font-bold tracking-tight leading-[1.08] mt-4">A simple money dashboard for freelancers who don’t want accounting software.</h1>
-          <p className="text-gray-600 mt-4 text-[17px] leading-relaxed">Income, expenses, and invoices in one place — track profit without spreadsheets or a full accounting setup.</p>
+          <h1 className="text-4xl md:text-[42px] font-bold tracking-tight leading-[1.08] mt-4">A simple money dashboard for post-production freelancers who don’t want accounting software.</h1>
+          <p className="text-gray-600 mt-4 text-[17px] leading-relaxed">Income, expenses, and invoices in one place — built for colorists, editors, and post-production freelancers juggling projects, revisions, and client payments.</p>
           
           {/* CTA */}
           <div className="mt-7">
@@ -53,7 +53,7 @@ export default function Landing(){
             {[
               {t:'Income & Expenses', d:'Add in seconds, attach receipts'},
               {t:'Invoices that pay', d:'PDFs + status tracking'},
-              {t:'Tax-ready reports', d:'CSV export when you need it'},
+              {t:'Exportable reports', d:'CSV exports for your records and tax preparation'},
             ].map(f=> <li key={f.t} className="border border-gray-100 rounded-2xl p-3.5 bg-gray-50/50"><div className="font-semibold text-[13px]">{f.t}</div><div className="text-gray-500 text-xs mt-1">{f.d}</div></li>)}
           </ul>
         </div>
@@ -85,8 +85,8 @@ export default function Landing(){
                 <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5">Paid</span>
               </div>
               <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-xs">
-                <div className="flex justify-between"><span className="text-gray-500">Client: Acme Co</span><span className="font-medium">$2,500.00</span></div>
-                <div className="flex justify-between mt-1 text-[11px] text-gray-400"><span>Create → Send → Track → Paid</span><span>Due Apr 04</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Color grading — Project X</span><span className="font-medium">$2,500.00</span></div>
+                <div className="flex justify-between mt-1 text-[11px] text-gray-400"><span>2 revisions · Final delivery</span><span>Due Apr 04</span></div>
               </div>
             </div>
           </div>
@@ -98,9 +98,9 @@ export default function Landing(){
         <h2 className="text-sm font-semibold tracking-wide uppercase text-gray-500 text-center">How it works</h2>
         <div className="grid md:grid-cols-3 gap-4 mt-4 max-w-3xl mx-auto">
           {[
-            {n:'1', t:'Add income & expenses', d:'Log payments and spend in seconds. Attach receipts.'},
-            {n:'2', t:'Create invoices', d:'Professional PDF, tax rate saved per invoice.'},
-            {n:'3', t:'Track profit', d:'Dashboard + reports. Export CSV for taxes.'},
+            {n:'1', t:'Add income & expenses', d:'Log project payments and spend in seconds. Attach receipts.'},
+            {n:'2', t:'Create invoices', d:'Per-project PDF — grading, revisions, milestones.'},
+            {n:'3', t:'Track profit', d:'Dashboard + reports. CSV exports for your records.'},
           ].map(s=> <div key={s.n} className="text-center border border-gray-100 rounded-2xl p-5 bg-white"><div className="w-7 h-7 rounded-full bg-teal-700 text-white grid place-items-center text-xs font-bold mx-auto">{s.n}</div><div className="font-semibold text-sm mt-3">{s.t}</div><div className="text-xs text-gray-500 mt-1">{s.d}</div></div>)}
         </div>
       </section>
@@ -108,7 +108,7 @@ export default function Landing(){
       {/* Positioning + trust */}
       <section className="max-w-6xl mx-auto px-6 py-8 grid md:grid-cols-3 gap-6 border-t border-gray-100">
         {[
-          { title:'Built for freelancers', desc:'For independent work without a finance team — not a full accounting system you need to learn.'},
+          { title:'Built for post-production', desc:'For colorists, editors, and post freelancers — project → revision → milestone → invoice → payment, without a finance team.'},
           { title:'You stay in control', desc:'No bank syncing. No team bloat. Export your CSV or delete your account anytime — one click in Settings.'},
           { title:'Fast & minimal', desc:'White space, one accent color, mobile-ready. Example states guide you, not blank screens.'},
         ].map(c=> <div key={c.title} className="rounded-2xl border border-gray-200 p-5 bg-white"><h3 className="font-semibold text-sm">{c.title}</h3><p className="text-sm text-gray-500 mt-2 leading-relaxed">{c.desc}</p></div>)}
@@ -121,7 +121,7 @@ export default function Landing(){
           <p className="text-sm text-gray-600 mt-2">No credit card required. Use all features — income, expenses, invoices, reports. Pricing will be simple and transparent when we launch.</p>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <h3 className="font-semibold text-sm">Built for independent freelancers, by yuviyagliet</h3>
+          <h3 className="font-semibold text-sm">Built for post-production freelancers, by yuviyagliet</h3>
           <p className="text-sm text-gray-500 mt-2">Indie maker building tools for freelance work. Questions about your financial records? Reach out — you’ll get a human.</p>
           <a href="mailto:hello@clearbooks.app" className="text-xs text-teal-700 font-medium mt-3 inline-block hover:underline">hello@clearbooks.app →</a>
         </div>

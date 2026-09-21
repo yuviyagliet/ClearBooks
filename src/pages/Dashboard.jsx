@@ -4,6 +4,7 @@ import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { Card, Button, Empty } from '../components/UI'
 import { formatCurrency, last6Months, exportCSV } from '../utils/helpers'
+import { outstandingSummary, paymentsInRange, amountOutstanding } from '../utils/payments'
 import { track } from '../lib/analytics'
 
 export default function Dashboard(){
@@ -57,28 +58,37 @@ export default function Dashboard(){
 
   const now=new Date()
   const ym = now.toISOString().slice(0,7)
+  // Received = money actually in hand (income entries + invoice payments this month)
   const incomeMonth = data.income.filter(i=> i.date?.slice(0,7)===ym).reduce((s,x)=>s+Number(x.amount||0),0)
+  const monthStart = `${ym}-01`
+  const monthEnd = new Date(now.getFullYear(), now.getMonth()+1, 0).toISOString().slice(0,10)
+  const invoicePaidMonth = paymentsInRange(data.invoices, monthStart, monthEnd).total
+  const receivedMonth = incomeMonth + invoicePaidMonth
+  // Outstanding = invoiced but not yet paid (never counted as income)
+  const outstanding = outstandingSummary(data.invoices)
   const expenseMonth = data.expenses.filter(e=> e.date?.slice(0,7)===ym).reduce((s,x)=>s+Number(x.amount||0),0)
-  const profit = incomeMonth - expenseMonth
+  const profit = receivedMonth - expenseMonth
 
   const months = last6Months()
   const chartData = months.map(m=>{
     const inc = data.income.filter(i=> isSameMonthLocal(i.date,m.year,m.month)).reduce((s,x)=>s+Number(x.amount),0)
+    const invPaid = data.invoices.reduce((s,inv)=> s + (Array.isArray(inv.payments) ? inv.payments : []).filter(p=> isSameMonthLocal(p.date,m.year,m.month)).reduce((a,p)=> a + (Number(p.amount)||0),0),0)
     const exp = data.expenses.filter(e=> isSameMonthLocal(e.date,m.year,m.month)).reduce((s,x)=>s+Number(x.amount),0)
-    return { label:m.label, inc, exp }
+    return { label:m.label, inc: inc + invPaid, exp }
   })
   const maxVal = Math.max(1, ...chartData.flatMap(d=>[d.inc,d.exp]))
 
   const handleExportAll = ()=>{
-    const rows = [['Type','Date','Invoice Number','Client','Category','Description','Amount','Tax Rate %','Tax Amount','Total','Currency','Status']]
-    data.income.forEach(i=> rows.push(['Income', i.date, '', i.client_name||'', '', i.description||'', i.amount, '', '', '', data.settings.currency, '']))
-    data.expenses.forEach(e=> rows.push(['Expense', e.date, '', '', e.category||'', e.description||'', e.amount, '', '', '', data.settings.currency, '']))
+    const rows = [['Type','Date','Invoice Number','Client','Category','Description','Amount','Tax Rate %','Tax Amount','Total','Paid','Outstanding','Currency','Status']]
+    data.income.forEach(i=> rows.push(['Income', i.date, '', i.client_name||'', '', i.description||'', i.amount, '', '', '', '', '', data.settings.currency, '']))
+    data.expenses.forEach(e=> rows.push(['Expense', e.date, '', '', e.category||'', e.description||'', e.amount, '', '', '', '', '', data.settings.currency, '']))
     data.invoices.forEach(inv=>{
       const rate = Number(inv.tax_rate ?? 0)
       const grand = Number(inv.total_amount || 0)
       const sub = Number(inv.subtotal ?? (rate ? grand / (1 + rate/100) : grand))
       const tax = Number(inv.tax_amount ?? (sub * rate / 100))
-      rows.push(['Invoice', inv.issue_date, inv.invoice_number, inv.client_name||'', '', (inv.line_items||[]).map(l=>l.description).join('; '), sub, rate, tax, grand, data.settings.currency, inv.status])
+      const paid = (Array.isArray(inv.payments) ? inv.payments : []).reduce((s,p)=> s + (Number(p.amount)||0), 0)
+      rows.push(['Invoice', inv.issue_date, inv.invoice_number, inv.client_name||'', '', (inv.line_items||[]).map(l=>l.description).join('; '), sub, rate, tax, grand, paid, grand - paid, data.settings.currency, inv.status])
     })
     const date = new Date().toISOString().slice(0,10)
     exportCSV(`clearbooks-export-${date}.csv`, rows)
@@ -133,11 +143,14 @@ export default function Dashboard(){
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Stat title="Income this month" value={formatCurrency(incomeMonth, data.settings.currency)} sub={`${data.income.filter(i=>i.date?.slice(0,7)===ym).length} entries`} color="teal" />
+      {/* Received vs Outstanding — unpaid invoices are never counted as income */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Stat title="Received this month" value={formatCurrency(receivedMonth, data.settings.currency)} sub={`Cash in hand${invoicePaidMonth>0 ? ` (incl. ${formatCurrency(invoicePaidMonth, data.settings.currency)} invoice payments)` : ''}`} color="teal" />
+        <Stat title="Outstanding" value={formatCurrency(outstanding.outstanding, data.settings.currency)} sub={outstanding.openCount===0 ? 'Nothing owed — all clear' : `${outstanding.openCount} open invoice${outstanding.openCount===1?'':'s'}${outstanding.overdue>0 ? ` · ${formatCurrency(outstanding.overdue, data.settings.currency)} overdue` : ''}`} color={outstanding.outstanding>0?'amber':'emerald'} />
         <Stat title="Expenses this month" value={formatCurrency(expenseMonth, data.settings.currency)} sub={`${data.expenses.filter(e=>e.date?.slice(0,7)===ym).length} entries`} color="amber" />
         <Stat title="Net profit" value={formatCurrency(profit, data.settings.currency)} sub={profit>=0?'Positive cash flow':'Negative — watch spend'} color={profit>=0?'emerald':'red'} />
       </div>
+      <p className="text-[11px] text-gray-400 -mt-3">Invoiced ≠ income: unpaid invoices show under Outstanding until the client pays. Only received money counts toward profit.</p>
 
       <Card className="p-5 md:p-6">
         <div className="flex items-center justify-between mb-4">
@@ -166,6 +179,27 @@ export default function Dashboard(){
           </>
         )}
       </Card>
+
+      {outstanding.outstanding > 0 && (
+        <Card className="p-5 border-amber-200 bg-amber-50/30">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold">Needs attention — {formatCurrency(outstanding.outstanding, data.settings.currency)} still owed</h3>
+            <Link to="/invoices" className="text-xs font-semibold text-teal-700 hover:underline">Open invoices →</Link>
+          </div>
+          <ul className="divide-y divide-amber-100">
+            {[...data.invoices].filter(inv=> amountOutstanding(inv) > 0).sort((a,b)=> a.due_date.localeCompare(b.due_date)).slice(0,4).map(inv=>{
+              const bal = amountOutstanding(inv)
+              const overdue = inv.due_date < new Date().toISOString().slice(0,10)
+              return (
+                <li key={inv.id} className="py-2 flex items-center justify-between text-sm gap-2">
+                  <span className="truncate"><span className="font-mono text-xs font-semibold">{inv.invoice_number}</span> · {inv.client_name} <span className="text-gray-400">· due {inv.due_date}</span></span>
+                  <span className="flex items-center gap-2 shrink-0"><span className="font-semibold">{formatCurrency(bal, data.settings.currency)}</span><span className={`text-[10px] font-bold border rounded-full px-2 py-0.5 ${overdue?'bg-red-50 text-red-700 border-red-200':'bg-amber-50 text-amber-700 border-amber-200'}`}>{overdue?'Overdue':'Due'}</span></span>
+                </li>
+              )
+            })}
+          </ul>
+        </Card>
+      )}
 
       <div className="grid md:grid-cols-2 gap-4">
         <Card className="p-5">

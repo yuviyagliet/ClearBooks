@@ -47,6 +47,13 @@ export function loadLocal() {
         if (inv.subtotal == null) inv.subtotal = inv.total_amount || 0
         if (inv.tax_amount == null) inv.tax_amount = Number((inv.subtotal * (inv.tax_rate||0) / 100).toFixed(2))
         if (inv.total_amount == null) inv.total_amount = inv.subtotal + inv.tax_amount
+        // migrate legacy "Paid" invoices into payment records
+        if (!Array.isArray(inv.payments)) {
+          inv.payments = inv.status === 'Paid'
+            ? [{ id: 'mig-' + inv.id, amount: Number(inv.total_amount) || 0, date: inv.issue_date, note: 'Marked as paid (legacy)' }]
+            : []
+          migrated = true
+        }
       })
       if (migrated) console.warn('Migrated old invoices to add tax_rate — historical data may need manual review (flagged _taxMigrated).')
     }

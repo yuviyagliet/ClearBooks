@@ -3,15 +3,23 @@
 
 create extension if not exists "uuid-ossp";
 
--- CLIENTS
+-- CLIENTS — enriched for post-production freelancers (company, phone, billing, GSTIN)
 create table if not exists public.clients (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null check (char_length(name) >= 2),
   email text check (email is null or email ~* '^[^\s@]+@[^\s@]+\.[^\s@]+$'),
+  company text,
+  phone text,
+  billing_address text,
+  gstin text,
   notes text,
   created_at timestamp with time zone default now()
 );
+alter table public.clients add column if not exists company text;
+alter table public.clients add column if not exists phone text;
+alter table public.clients add column if not exists billing_address text;
+alter table public.clients add column if not exists gstin text;
 alter table public.clients enable row level security;
 drop policy if exists "Users can manage own clients" on public.clients;
 create policy "Users can manage own clients" on public.clients
@@ -53,7 +61,8 @@ create policy "Users manage own expenses" on public.expenses
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create index if not exists expenses_user_id_idx on public.expenses(user_id);
 
--- INVOICES — tax_rate is snapshotted per invoice (e.g., 18 for 18% GST/VAT) so old invoices never recalc when global rate changes
+-- INVOICES — tax_rate is snapshotted per invoice (e.g. 18 for 18% GST/VAT) so old invoices never recalc when global rate changes
+-- Plus payment workflow: payments[] jsonb (partial payments), payment_date, sent_at
 create table if not exists public.invoices (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -66,14 +75,20 @@ create table if not exists public.invoices (
   line_items jsonb not null default '[]'::jsonb,
   total_amount numeric not null check (total_amount > 0),
   tax_rate numeric not null default 0 check (tax_rate >= 0 and tax_rate <= 100),
+  payments jsonb not null default '[]'::jsonb,
+  payment_date date,
+  sent_at timestamp with time zone,
   created_at timestamp with time zone default now(),
   unique(user_id, invoice_number)
 );
+alter table public.invoices add column if not exists payment_date date;
+alter table public.invoices add column if not exists sent_at timestamp with time zone;
+alter table public.invoices add column if not exists payments jsonb not null default '[]'::jsonb;
 -- Migration: add tax_rate if table already existed without it
 alter table public.invoices add column if not exists tax_rate numeric not null default 0 check (tax_rate >= 0 and tax_rate <= 100);
 alter table public.invoices add column if not exists subtotal numeric check (subtotal >= 0);
 alter table public.invoices add column if not exists tax_amount numeric check (tax_amount >= 0);
--- Backfill: existing invoices without a meaningful rate get 0 and should be reviewed; set to current default (e.g., 18) if you prefer:
+-- Backfill: existing invoices without a meaningful rate get 0 and should be reviewed; set to current default (e.g. 18) if you prefer:
 -- update public.invoices set tax_rate = 18 where tax_rate is null or tax_rate = 0;
 -- update public.invoices set subtotal = total_amount / (1 + tax_rate/100.0), tax_amount = total_amount - subtotal where subtotal is null;
 -- To flag historical rows needing review:

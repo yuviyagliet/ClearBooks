@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useData } from '../context/DataContext'
 import { Card, Button, Input, Label } from '../components/UI'
 import { formatCurrency, exportCSV } from '../utils/helpers'
+import { amountPaid, amountOutstanding, paymentsInRange } from '../utils/payments'
 
 export default function Reports(){
   const { data } = useData()
@@ -15,7 +16,7 @@ export default function Reports(){
     const inRange = (dStr)=>{
       const d=new Date(dStr); return d>=f && d<=t
     }
-    if (isInvalidRange) return { income: [], expenses: [], invoices: [], totalIncome: 0, totalExpenses: 0, net: 0, byCategory: {}, totalTax: 0, taxByInvoice: [] }
+    if (isInvalidRange) return { income: [], expenses: [], invoices: [], totalIncome: 0, totalExpenses: 0, net: 0, byCategory: {}, totalTax: 0, taxByInvoice: [], invoicedTotal: 0, invoicePaidTotal: 0, invoiceOutstanding: 0 }
     const income = data.income.filter(i=> inRange(i.date))
     const expenses = data.expenses.filter(e=> inRange(e.date))
     const invoices = data.invoices.filter(inv=> inRange(inv.issue_date))
@@ -32,7 +33,11 @@ export default function Reports(){
       return { ...inv, _rate: rate, _sub: sub, _tax: tax }
     })
     const totalTax = taxByInvoice.reduce((s,inv)=> s + inv._tax, 0)
-    return { income, expenses, invoices, totalIncome, totalExpenses, net: totalIncome-totalExpenses, byCategory, totalTax, taxByInvoice }
+    // Invoiced vs Received: unpaid invoices are money owed, NOT income
+    const invoicedTotal = invoices.reduce((s,inv)=> s + (Number(inv.total_amount)||0), 0)
+    const invoicePaidTotal = invoices.reduce((s,inv)=> s + amountPaid(inv), 0)
+    const invoiceOutstanding = invoices.reduce((s,inv)=> s + amountOutstanding(inv), 0)
+    return { income, expenses, invoices, totalIncome, totalExpenses, net: totalIncome-totalExpenses, byCategory, totalTax, taxByInvoice, invoicedTotal, invoicePaidTotal, invoiceOutstanding }
   }, [data, from, to, isInvalidRange])
 
   const maxCat = Math.max(1, ...Object.values(filtered.byCategory))
@@ -40,10 +45,10 @@ export default function Reports(){
 
   const handleExport=()=>{
     if (isInvalidRange) return
-    const rows = [['Type','Date','Invoice Number','Client','Category','Description','Amount','Tax Rate %','Tax Amount','Total','Currency','Status']]
-    filtered.income.forEach(i=> rows.push(['Income', i.date, '', i.client_name||'', '', i.description||'', i.amount, '', '', '', data.settings.currency, '']))
-    filtered.expenses.forEach(e=> rows.push(['Expense', e.date, '', '', e.category||'', e.description||'', e.amount, '', '', '', data.settings.currency, '']))
-    filtered.taxByInvoice.forEach(inv=> rows.push(['Invoice', inv.issue_date, inv.invoice_number, inv.client_name||'', '', (inv.line_items||[]).map(l=>l.description).join('; '), inv._sub, inv._rate, inv._tax, inv.total_amount, data.settings.currency, inv.status]))
+    const rows = [['Type','Date','Invoice Number','Client','Category','Description','Amount','Tax Rate %','Tax Amount','Total','Paid','Outstanding','Currency','Status']]
+    filtered.income.forEach(i=> rows.push(['Income', i.date, '', i.client_name||'', '', i.description||'', i.amount, '', '', '', '', '', data.settings.currency, '']))
+    filtered.expenses.forEach(e=> rows.push(['Expense', e.date, '', '', e.category||'', e.description||'', e.amount, '', '', '', '', '', data.settings.currency, '']))
+    filtered.taxByInvoice.forEach(inv=> rows.push(['Invoice', inv.issue_date, inv.invoice_number, inv.client_name||'', '', (inv.line_items||[]).map(l=>l.description).join('; '), inv._sub, inv._rate, inv._tax, inv.total_amount, amountPaid(inv), amountOutstanding(inv), data.settings.currency, inv.status]))
     exportCSV(`clearbooks-export-${from}_to_${to}.csv`, rows)
   }
 
@@ -62,11 +67,21 @@ export default function Reports(){
       {isInvalidRange && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">The start date must be earlier than or equal to the end date.</div>}
 
       <div className="grid md:grid-cols-4 gap-4">
-        <Card className="p-5"><div className="text-xs uppercase tracking-wide font-bold text-teal-700">Total income</div><div className="text-2xl font-bold mt-1">{formatCurrency(filtered.totalIncome, data.settings.currency)}</div></Card>
+        <Card className="p-5"><div className="text-xs uppercase tracking-wide font-bold text-teal-700">Received (income)</div><div className="text-2xl font-bold mt-1">{formatCurrency(filtered.totalIncome, data.settings.currency)}</div><div className="text-[11px] text-gray-400 mt-1">Cash actually received</div></Card>
         <Card className="p-5"><div className="text-xs uppercase tracking-wide font-bold text-amber-700">Total expenses</div><div className="text-2xl font-bold mt-1">{formatCurrency(filtered.totalExpenses, data.settings.currency)}</div></Card>
         <Card className="p-5"><div className="text-xs uppercase tracking-wide font-bold text-violet-700">GST/VAT collected</div><div className="text-2xl font-bold mt-1">{formatCurrency(filtered.totalTax, data.settings.currency)}</div><div className="text-[11px] text-gray-400 mt-1">Sum of each invoice’s own tax_rate</div></Card>
-        <Card className="p-5"><div className="text-xs uppercase tracking-wide font-bold text-gray-700">Net profit</div><div className={`text-2xl font-bold mt-1 ${filtered.net>=0?'text-emerald-700':'text-red-600'}`}>{formatCurrency(filtered.net, data.settings.currency)}</div></Card>
+        <Card className="p-5"><div className="text-xs uppercase tracking-wide font-bold text-gray-700">Net profit</div><div className={`text-2xl font-bold mt-1 ${filtered.net>=0?'text-emerald-700':'text-red-600'}`}>{formatCurrency(filtered.net, data.settings.currency)}</div><div className="text-[11px] text-gray-400 mt-1">Received − expenses</div></Card>
       </div>
+      {/* Invoiced vs Received — unpaid invoices are NOT income */}
+      <Card className="p-5 border-amber-200 bg-amber-50/30">
+        <h3 className="font-semibold text-sm">Invoices in range — owed vs received</h3>
+        <p className="text-[11px] text-gray-500 mt-1">Unpaid invoices are money you’re owed, not income. They don’t count toward profit until the client pays.</p>
+        <div className="grid grid-cols-3 gap-3 mt-3 text-center">
+          <div className="bg-white border border-gray-200 rounded-xl p-3"><div className="text-[10px] uppercase tracking-wide text-gray-500">Invoiced</div><div className="font-bold">{formatCurrency(filtered.invoicedTotal, data.settings.currency)}</div></div>
+          <div className="bg-white border border-emerald-200 rounded-xl p-3"><div className="text-[10px] uppercase tracking-wide text-emerald-700">Paid</div><div className="font-bold text-emerald-700">{formatCurrency(filtered.invoicePaidTotal, data.settings.currency)}</div></div>
+          <div className="bg-white border border-amber-200 rounded-xl p-3"><div className="text-[10px] uppercase tracking-wide text-amber-700">Outstanding</div><div className="font-bold text-amber-700">{formatCurrency(filtered.invoiceOutstanding, data.settings.currency)}</div></div>
+        </div>
+      </Card>
       {filtered.invoices.length>0 && (
         <Card className="p-5">
           <h3 className="font-semibold mb-3">Tax by invoice (per-invoice rate)</h3>

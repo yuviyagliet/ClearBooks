@@ -63,6 +63,12 @@ export function DataProvider({ children }) {
         invoicesData = invoicesData.map(inv => inv.tax_rate == null ? { ...inv, tax_rate: savedSettings.default_tax_rate, _taxMigrated: true } : inv)
       }
 
+      // Normalize payments array so UI never breaks on older rows/DBs
+      invoicesData = invoicesData.map(inv => ({
+        ...inv,
+        payments: Array.isArray(inv.payments) ? inv.payments : (inv.status === 'Paid' ? [{ id: 'mig-' + inv.id, amount: Number(inv.total_amount) || 0, date: inv.issue_date, note: 'Marked as paid (legacy)' }] : []),
+      }))
+
       setData({
         clients: clients.data || [],
         income: income.data || [],
@@ -84,6 +90,10 @@ export function DataProvider({ children }) {
   const sanitizeClient = (p) => ({
     name: p.name?.trim(),
     email: p.email?.trim() ? p.email.trim() : null,
+    company: p.company?.trim() || null,
+    phone: p.phone?.trim() || null,
+    billing_address: p.billing_address?.trim() || null,
+    gstin: p.gstin?.trim() || null,
     notes: p.notes?.trim() || null,
   })
   const addClient = async (payload) => {
@@ -201,7 +211,7 @@ export function DataProvider({ children }) {
     const subtotal = Number(payload.subtotal ?? payload.total_amount)
     const tax_amount = Number((subtotal * tax_rate / 100).toFixed(2))
     const grand_total = Number((subtotal + tax_amount).toFixed(2))
-    const toSave = { ...payload, tax_rate, subtotal, tax_amount, total_amount: grand_total }
+    const toSave = { ...payload, tax_rate, subtotal, tax_amount, total_amount: grand_total, payments: payload.payments ?? [] }
     const wasFirstInvoice = data.invoices.length === 0
     const uid = user?.id || 'anon'
     if(useLocalMode){
@@ -239,9 +249,58 @@ export function DataProvider({ children }) {
   }
   const updateInvoice = async(id,payload)=>{
     if(useLocalMode){ persist({...data, invoices:data.invoices.map(x=> x.id===id? {...x,...payload}:x)}); return}
-    const { error } = await supabase.from('invoices').update(payload).eq('id',id).eq('user_id', user.id)
-    if (error) throw new Error(error.message)
+    // Strip computed-only fields before sending to Supabase
+    const { _taxMigrated, _rate, _sub, _tax, ...clean } = payload
+    // Drop payments-related keys if the column doesn't exist yet (older DBs)
+    const { error } = await supabase.from('invoices').update(clean).eq('id',id).eq('user_id', user.id)
+    if (error) {
+      if (error.message.includes('payments') || error.message.includes('payment_date') || error.message.includes('sent_at') || error.message.includes('schema cache')) {
+        const { payments: _p, payment_date: _pd, sent_at: _s, ...rest } = clean
+        const retry = await supabase.from('invoices').update(rest).eq('id',id).eq('user_id', user.id)
+        if (retry.error) throw new Error(retry.error.message)
+        await refresh()
+        return
+      }
+      throw new Error(error.message)
+    }
     await refresh()
+  }
+
+  const normalizeInvoice = (inv) => ({
+    ...inv,
+    payments: Array.isArray(inv.payments) ? inv.payments : (inv.status === 'Paid' ? [{ id: 'mig-' + inv.id, amount: Number(inv.total_amount) || 0, date: inv.issue_date, note: 'Marked as paid (legacy)' }] : []),
+  })
+
+  const recordPayment = async (id, { amount, date, note }) => {
+    const inv = data.invoices.find(x => x.id === id)
+    if (!inv) throw new Error('Invoice not found')
+    const amt = Number(amount)
+    if (!amt || isNaN(amt) || amt <= 0) throw new Error('Payment amount must be positive')
+    if (!date) throw new Error('Payment date is required')
+    const paid = (Array.isArray(inv.payments) ? inv.payments : []).reduce((s,p)=> s + (Number(p.amount)||0), 0)
+    const outstanding = Number(inv.total_amount) - paid
+    if (amt > outstanding + 0.009) throw new Error(`Payment exceeds outstanding (${outstanding.toFixed(2)})`)
+    const payment = { id: 'p' + Date.now(), amount: amt, date, note: note?.trim() || '' }
+    const payments = [...(Array.isArray(inv.payments) ? inv.payments : []), payment]
+    const newPaid = paid + amt
+    const fullyPaid = newPaid >= Number(inv.total_amount) - 0.009
+    const payload = { payments, status: fullyPaid ? 'Paid' : inv.status === 'Paid' ? 'Unpaid' : inv.status, payment_date: fullyPaid ? date : (inv.payment_date || null) }
+    await updateInvoice(id, payload)
+    return payment
+  }
+
+  const markPaid = async (id, date) => {
+    const inv = data.invoices.find(x => x.id === id)
+    if (!inv) throw new Error('Invoice not found')
+    const paid = (Array.isArray(inv.payments) ? inv.payments : []).reduce((s,p)=> s + (Number(p.amount)||0), 0)
+    const outstanding = Number(inv.total_amount) - paid
+    if (outstanding <= 0) return
+    const d = date || new Date().toISOString().slice(0,10)
+    return await recordPayment(id, { amount: Number(outstanding.toFixed(2)), date: d, note: 'Marked as paid' })
+  }
+
+  const markSent = async (id) => {
+    await updateInvoice(id, { sent_at: new Date().toISOString() })
   }
   const deleteInvoice = async(id)=>{
     if(useLocalMode){ persist({...data, invoices:data.invoices.filter(x=>x.id!==id)}); return}
@@ -256,7 +315,7 @@ export function DataProvider({ children }) {
     localStorage.setItem('clearbooks_settings', JSON.stringify(next.settings))
   }
 
-  return <DataContext.Provider value={{ data, loading, error, refresh, addClient, updateClient, deleteClient, addIncome, updateIncome, deleteIncome, addExpense, updateExpense, deleteExpense, addInvoice, updateInvoice, deleteInvoice, updateSettings }}>
+  return <DataContext.Provider value={{ data, loading, error, refresh, addClient, updateClient, deleteClient, addIncome, updateIncome, deleteIncome, addExpense, updateExpense, deleteExpense, addInvoice, updateInvoice, deleteInvoice, recordPayment, markPaid, markSent, normalizeInvoice, updateSettings }}>
     {children}
   </DataContext.Provider>
 }

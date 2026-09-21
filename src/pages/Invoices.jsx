@@ -159,12 +159,12 @@ export default function InvoicesPage(){
             <div className="flex items-center justify-between mb-2"><Label>Line items *</Label><Button type="button" variant="ghost" onClick={addLine} className="text-xs py-1.5">＋ Add line</Button></div>
             <div className="space-y-2">
               {form.line_items.map((l,i)=>(
-                <div key={i} className="grid grid-cols-12 gap-2 items-end bg-gray-50 border border-gray-100 rounded-xl p-3">
-                  <div className="col-span-12 md:col-span-6"><Label htmlFor={`invoice-desc-${i}`}>Description *</Label><Input id={`invoice-desc-${i}`} value={l.description} onChange={e=>updateLine(i,{description:e.target.value})} placeholder="Web design" required minLength={2} /></div>
-                  <div className="col-span-4 md:col-span-2"><Label htmlFor={`invoice-qty-${i}`}>Qty *</Label><Input id={`invoice-qty-${i}`} type="number" min="1" step="1" value={l.quantity} onChange={e=>updateLine(i,{quantity:e.target.value})} required /></div>
-                  <div className="col-span-4 md:col-span-2"><Label htmlFor={`invoice-rate-${i}`}>Rate ({data.settings.currency}) *</Label><Input id={`invoice-rate-${i}`} type="number" min="0.01" step="0.01" value={l.rate} onChange={e=>updateLine(i,{rate:e.target.value})} required /></div>
-                  <div className="col-span-3 md:col-span-1 text-sm font-semibold text-right">{formatCurrency((Number(l.quantity)||0)*(Number(l.rate)||0), data.settings.currency)}</div>
-                  <div className="col-span-1 flex justify-end"><button type="button" onClick={()=>removeLine(i)} className="text-xs text-red-600 hover:underline" disabled={form.line_items.length===1}>✕</button></div>
+                <div key={i} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end bg-gray-50 border border-gray-100 rounded-xl p-3">
+                  <div className="col-span-1 md:col-span-6"><Label htmlFor={`invoice-desc-${i}`}>Description *</Label><Input id={`invoice-desc-${i}`} value={l.description} onChange={e=>updateLine(i,{description:e.target.value})} placeholder="Color grading — project name" required minLength={2} /></div>
+                  <div className="col-span-1 md:col-span-2"><Label htmlFor={`invoice-qty-${i}`}>Qty *</Label><Input id={`invoice-qty-${i}`} type="number" min="1" step="1" value={l.quantity} onChange={e=>updateLine(i,{quantity:e.target.value})} required /></div>
+                  <div className="col-span-1 md:col-span-2"><Label htmlFor={`invoice-rate-${i}`}>Rate ({data.settings.currency}) *</Label><Input id={`invoice-rate-${i}`} type="number" min="0.01" step="0.01" value={l.rate} onChange={e=>updateLine(i,{rate:e.target.value})} required /></div>
+                  <div className="col-span-1 md:col-span-1 flex md:block justify-between items-center"><span className="text-xs text-gray-500 md:hidden">Total</span><span className="text-sm font-semibold">{formatCurrency((Number(l.quantity)||0)*(Number(l.rate)||0), data.settings.currency)}</span><button type="button" onClick={()=>removeLine(i)} className="ml-3 text-xs text-red-600 hover:underline md:hidden" disabled={form.line_items.length===1}>Remove</button></div>
+                  <div className="hidden md:flex col-span-1 justify-end"><button type="button" onClick={()=>removeLine(i)} className="text-xs text-red-600 hover:underline" disabled={form.line_items.length===1}>✕</button></div>
                 </div>
               ))}
             </div>

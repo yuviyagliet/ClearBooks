@@ -71,8 +71,11 @@ create table if not exists public.invoices (
 );
 -- Migration: add tax_rate if table already existed without it
 alter table public.invoices add column if not exists tax_rate numeric not null default 0 check (tax_rate >= 0 and tax_rate <= 100);
+alter table public.invoices add column if not exists subtotal numeric check (subtotal >= 0);
+alter table public.invoices add column if not exists tax_amount numeric check (tax_amount >= 0);
 -- Backfill: existing invoices without a meaningful rate get 0 and should be reviewed; set to current default (e.g., 18) if you prefer:
 -- update public.invoices set tax_rate = 18 where tax_rate is null or tax_rate = 0;
+-- update public.invoices set subtotal = total_amount / (1 + tax_rate/100.0), tax_amount = total_amount - subtotal where subtotal is null;
 -- To flag historical rows needing review:
 -- alter table public.invoices add column if not exists tax_rate_migrated boolean default false;
 -- update public.invoices set tax_rate_migrated = true where tax_rate = 0;

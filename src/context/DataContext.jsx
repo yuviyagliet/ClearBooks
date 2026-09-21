@@ -216,8 +216,20 @@ export function DataProvider({ children }) {
       return num
     }
     const num = `INV-${data.invoice_counter}`
-    const { error } = await supabase.from('invoices').insert({ ...toSave, invoice_number:num, user_id:user.id })
-    if (error) throw new Error(error.message)
+    // Resilient insert: try full payload, fallback without subtotal/tax_amount if schema not yet migrated
+    let insertError = null
+    let { error } = await supabase.from('invoices').insert({ ...toSave, invoice_number:num, user_id:user.id })
+    if (error && (error.message.includes('subtotal') || error.message.includes('tax_amount') || error.message.includes('schema cache'))) {
+      console.warn('Retrying invoice insert without subtotal/tax_amount (run schema migration)', error.message)
+      const { subtotal: _s, tax_amount: _t, ...rest } = toSave
+      const fallback = { ...rest, total_amount: grand_total, invoice_number:num, user_id:user.id }
+      const retry = await supabase.from('invoices').insert(fallback)
+      if (retry.error) insertError = retry.error
+      else error = null
+    } else {
+      insertError = error
+    }
+    if (insertError || error) throw new Error((insertError || error).message)
     await refresh();
     if (wasFirstInvoice && !localStorage.getItem(`tracked_first_invoice_${uid}`)) {
       track('first_invoice_created', { total: grand_total, tax_rate })

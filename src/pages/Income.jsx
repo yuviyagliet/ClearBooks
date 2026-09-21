@@ -73,7 +73,7 @@ export default function IncomePage(){
           <Link to="/dashboard" className="text-xs bg-white text-teal-700 rounded-full px-4 py-2 font-semibold hover:bg-teal-50 self-start md:self-center">Skip → Dashboard</Link>
         </div>
       )}
-      <div><h1 className="text-2xl font-bold">Income</h1><p className="text-sm text-gray-500">Log client payments & revenue.</p></div>
+      <div><h1 className="text-2xl font-bold">Income</h1><p className="text-sm text-gray-500">Direct income entries live here. Invoice payments appear automatically once marked paid.</p></div>
 
       <Card className="p-5">
         <h2 className="font-semibold mb-4">{editing?'Edit income':'Add income'}</h2>
@@ -100,6 +100,32 @@ export default function IncomePage(){
           </div>
         </form>
       </Card>
+
+      {(() => {
+        const pays = []
+        data.invoices.forEach(inv=> (Array.isArray(inv.payments) ? inv.payments : []).forEach(p=> pays.push({ ...p, invoice_number: inv.invoice_number, client_name: inv.client_name, invoice_id: inv.id })))
+        pays.sort((a,b)=> (b.date||'').localeCompare(a.date||''))
+        if (pays.length === 0) return null
+        const totalPaid = pays.reduce((s,p)=> s + (Number(p.amount)||0), 0)
+        return (
+          <Card className="p-5 border-emerald-200 bg-emerald-50/30">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-semibold text-sm">Invoice payments received — {formatCurrency(totalPaid, data.settings.currency)}</h3>
+              <Link to="/invoices" className="text-xs font-semibold text-teal-700 hover:underline">Manage invoices →</Link>
+            </div>
+            <p className="text-[11px] text-gray-500 mb-3">Client paid an invoice? Mark it paid there and it appears here automatically — and counts toward Received on your dashboard.</p>
+            <ul className="divide-y divide-emerald-100">
+              {pays.slice(0,5).map(p=>(
+                <li key={p.id} className="py-2 flex items-center justify-between text-sm gap-2">
+                  <span className="truncate"><span className="font-mono text-xs font-semibold">{p.invoice_number}</span> · {p.client_name} <span className="text-gray-400">· {p.date}{p.note ? ` · ${p.note}` : ''}</span></span>
+                  <span className="font-semibold text-emerald-700 whitespace-nowrap">+{formatCurrency(p.amount, data.settings.currency)}</span>
+                </li>
+              ))}
+            </ul>
+            {pays.length > 5 && <p className="text-[11px] text-gray-400 mt-2">+ {pays.length - 5} more — see all on the Invoices page.</p>}
+          </Card>
+        )
+      })()}
 
       {data.income.length===0 ? <Empty title="No income yet" desc="Add your first payment to see it here." /> :
         <Card className="overflow-hidden">

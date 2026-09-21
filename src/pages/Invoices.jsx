@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { Card, Button, Input, Select, Label, Empty } from '../components/UI'
-import { formatCurrency, TAX_TYPES, taxLabel } from '../utils/helpers'
+import { formatCurrency, taxLabel } from '../utils/helpers'
 import { getPayments, amountPaid, amountOutstanding, invoiceStatus, statusBadgeClass, outstandingSummary } from '../utils/payments'
 import jsPDF from 'jspdf'
 
@@ -18,6 +18,23 @@ export default function InvoicesPage(){
   const [payForm,setPayForm]=useState({ amount:'', date:new Date().toISOString().slice(0,10), note:'' })
   const [search,setSearch]=useState('')
   const [statusFilter,setStatusFilter]=useState('All')
+  const [justCreatedNum,setJustCreatedNum]=useState(null) // completed-invoice view after create
+  const [expandedId,setExpandedId]=useState(null) // per-row details + activity
+
+  const justCreated = justCreatedNum ? data.invoices.find(i=> i.invoice_number === justCreatedNum) : null
+
+  const fmtDay = (dStr)=>{
+    if (!dStr) return '—'
+    try { return new Date(dStr.length > 10 ? dStr : dStr + 'T00:00:00').toLocaleDateString('en-US',{month:'short', day:'numeric'}) } catch { return dStr }
+  }
+
+  // Invoice activity timeline: Created → Sent → Payment(s) → Paid
+  const activityFor = (inv)=>{
+    const events = [{ date: (inv.created_at||'').slice(0,10) || inv.issue_date, label: `Created ${inv.invoice_number}`, key: 'created' }]
+    if (inv.sent_at) events.push({ date: inv.sent_at.slice(0,10), label: 'Sent to client', key: 'sent' })
+    getPayments(inv).forEach(p=> events.push({ date: p.date, label: `Payment received ${formatCurrency(p.amount, data.settings.currency)}${p.note ? ` — ${p.note}` : ''}`, key: p.id }))
+    return events.sort((a,b)=> (a.date||'').localeCompare(b.date||''))
+  }
 
   const visibleInvoices = useMemo(()=>{
     const q = search.trim().toLowerCase()
@@ -72,9 +89,16 @@ export default function InvoicesPage(){
       total_amount: total,
     }
     try{
-      if(editing) await updateInvoice(editing, payload)
-      else await addInvoice(payload)
-      setInfo(editing ? 'Invoice updated!' : `Invoice created! ${payload.invoice_number||''}`)
+      if(editing) {
+        await updateInvoice(editing, payload)
+        setInfo('Invoice updated!')
+      } else {
+        const num = await addInvoice(payload)
+        setInfo(`Invoice created! ${num||''}`)
+        setJustCreatedNum(num || null)
+        setExpandedId(null)
+        window.scrollTo({top:0, behavior:'smooth'})
+      }
       setForm({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', tax_type: data.settings.default_tax_type || 'none', tax_rate: data.settings.default_tax_rate ?? 0, line_items:[{description:'', quantity:1, rate:0}]}); setEditing(null)
       setTimeout(()=> setInfo(''), 3000)
     }catch(ex){ setErr(ex.message) }
@@ -203,6 +227,23 @@ export default function InvoicesPage(){
     <div className="space-y-6">
       <div><h1 className="text-2xl font-bold">Invoices</h1><p className="text-sm text-gray-500">Create → Send → Track → Paid.</p></div>
 
+      {/* Completed-invoice view right after creation */}
+      {justCreated && (
+        <CompletedInvoiceCard
+          inv={justCreated}
+          currency={data.settings.currency}
+          business={data.settings.business_name || data.settings.name || 'ClearBooks'}
+          client={data.clients.find(c=>c.id===justCreated.client_id)}
+          onClose={()=>setJustCreatedNum(null)}
+          onDownload={()=>downloadPDF(justCreated)}
+          onSend={()=>handleSend(justCreated)}
+          onMarkPaid={()=>handleMarkPaid(justCreated)}
+          activity={activityFor(justCreated)}
+          fmtDay={fmtDay}
+          badge={badge}
+        />
+      )}
+
       {/* Outstanding summary */}
       {data.invoices.length > 0 && (
         <Card className="p-5 bg-amber-50/40 border-amber-200">
@@ -293,7 +334,9 @@ export default function InvoicesPage(){
                   const pays = getPayments(inv)
                   const rate = Number(inv.tax_rate ?? 0)
                   const ttype = inv.tax_type || (rate > 0 ? 'custom' : 'none')
+                  const isOpen = expandedId === inv.id
                   return (
+                    <>
                     <tr key={inv.id} className="hover:bg-gray-50/50 align-top">
                       <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap">{inv.invoice_number}{inv.sent_at && <div className="text-[10px] text-gray-400 font-normal">Sent</div>}</td>
                       <td className="px-4 py-3">{inv.client_name}</td>
@@ -308,6 +351,7 @@ export default function InvoicesPage(){
                           {bal > 0 && <button onClick={()=>handleMarkPaid(inv)} className="text-xs bg-emerald-600 text-white rounded-full px-3 py-1 hover:bg-emerald-700">Mark as Paid</button>}
                           {bal > 0 && <button onClick={()=>{ setPayFor(payFor===inv.id?null:inv.id); setPayForm({ amount: bal.toFixed(2), date:new Date().toISOString().slice(0,10), note:'' }) }} className="text-xs bg-white border border-gray-200 rounded-full px-3 py-1 hover:bg-gray-50">+ Payment</button>}
                           {bal > 0 && <button onClick={()=>handleReminder(inv)} className="text-xs bg-white border border-gray-200 rounded-full px-3 py-1 hover:bg-gray-50">Remind</button>}
+                          <button onClick={()=>setExpandedId(isOpen?null:inv.id)} className="text-xs border border-gray-200 rounded-full px-3 py-1">{isOpen?'Hide':'Details'}</button>
                           <button onClick={()=>startEdit(inv)} className="text-xs border border-gray-200 rounded-full px-3 py-1">Edit</button>
                           <button onClick={async()=>{ if(confirm('Delete invoice?')){ try{ await deleteInvoice(inv.id)}catch(e){ alert(e.message)}}}} className="text-xs bg-red-50 text-red-700 border border-red-200 rounded-full px-3 py-1">Delete</button>
                         </div>
@@ -327,6 +371,40 @@ export default function InvoicesPage(){
                         )}
                       </td>
                     </tr>
+                    {isOpen && (
+                      <tr key={inv.id + '-details'} className="bg-gray-50/60">
+                        <td colSpan={6} className="px-4 py-4">
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Line items</div>
+                              <ul className="text-sm space-y-1">
+                                {(inv.line_items||[]).map((l,i)=>(
+                                  <li key={i} className="flex justify-between gap-2"><span className="truncate">{l.description} <span className="text-gray-400">× {l.quantity}</span></span><span className="font-medium whitespace-nowrap">{formatCurrency(l.total ?? (l.quantity*l.rate), data.settings.currency)}</span></li>
+                                ))}
+                              </ul>
+                              <div className="text-sm mt-2 pt-2 border-t space-y-0.5">
+                                <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatCurrency(inv.subtotal ?? inv.total_amount, data.settings.currency)}</span></div>
+                                <div className="flex justify-between text-gray-600"><span>{taxLabel(ttype, rate)}</span><span>{formatCurrency(inv.tax_amount ?? 0, data.settings.currency)}</span></div>
+                                <div className="flex justify-between font-bold"><span>Total</span><span>{formatCurrency(inv.total_amount, data.settings.currency)}</span></div>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Invoice activity</div>
+                              <ol className="relative border-l border-gray-200 ml-1.5 space-y-3">
+                                {activityFor(inv).map((ev,i)=>(
+                                  <li key={ev.key + i} className="ml-4">
+                                    <span className="absolute -left-1.5 mt-1 w-3 h-3 rounded-full bg-teal-600 border-2 border-white"></span>
+                                    <div className="text-sm font-medium">{ev.label}</div>
+                                    <div className="text-[11px] text-gray-500">{fmtDay(ev.date)} · {ev.date}</div>
+                                  </li>
+                                ))}
+                              </ol>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </>
                   )
                 })}
               </tbody>
@@ -334,6 +412,79 @@ export default function InvoicesPage(){
           </div>}
         </Card>
       }
+    </div>
+  )
+}
+
+// Completed-invoice experience: rendered invoice + actions + activity timeline.
+// Shown right after "Create invoice" so the user sees the finished result, not just the form.
+function CompletedInvoiceCard({ inv, currency, business, client, onClose, onDownload, onSend, onMarkPaid, activity, fmtDay, badge }){
+  const rate = Number(inv.tax_rate ?? 0)
+  const ttype = inv.tax_type || (rate > 0 ? 'custom' : 'none')
+  const sub = Number(inv.subtotal ?? (rate ? inv.total_amount / (1 + rate/100) : inv.total_amount))
+  const tax = Number(inv.tax_amount ?? (sub * rate / 100))
+  const paid = (Array.isArray(inv.payments) ? inv.payments : []).reduce((s,p)=> s + (Number(p.amount)||0), 0)
+  const bal = Number(inv.total_amount) - paid
+  const st = invoiceStatus(inv)
+  return (
+    <div className="bg-white border-2 border-teal-600 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-teal-700 text-white px-5 py-3 flex items-center justify-between">
+        <span className="text-sm font-semibold">✓ Invoice {inv.invoice_number} created</span>
+        <button onClick={onClose} className="text-xs bg-white/20 rounded-full px-3 py-1 hover:bg-white/30">Dismiss</button>
+      </div>
+      <div className="p-5 md:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-gray-400">Invoice</div>
+            <div className="text-2xl font-bold font-mono">INVOICE #{inv.invoice_number}</div>
+            <div className="text-sm font-semibold mt-2">{business}</div>
+          </div>
+          <div className="text-right">{badge(st)}</div>
+        </div>
+        <div className="mt-4 text-sm">
+          <div className="text-xs uppercase tracking-wide text-gray-400">Bill to</div>
+          <div className="font-semibold">{inv.client_name}</div>
+          {client?.company && <div className="text-gray-600">{client.company}</div>}
+          {client?.email && <div className="text-gray-600">{client.email}</div>}
+          {client?.billing_address && <div className="text-gray-600">{client.billing_address}</div>}
+        </div>
+        <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="text-left px-4 py-2">Service</th><th className="text-center px-4 py-2">Qty</th><th className="text-right px-4 py-2">Rate</th><th className="text-right px-4 py-2">Total</th></tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {(inv.line_items||[]).map((l,i)=>(
+                <tr key={i}><td className="px-4 py-2">{l.description}</td><td className="px-4 py-2 text-center">{l.quantity}</td><td className="px-4 py-2 text-right">{formatCurrency(l.rate, currency)}</td><td className="px-4 py-2 text-right font-medium">{formatCurrency(l.total ?? (l.quantity*l.rate), currency)}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-3 text-sm space-y-1 max-w-xs ml-auto">
+          <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatCurrency(sub, currency)}</span></div>
+          <div className="flex justify-between text-gray-600"><span>{taxLabel(ttype, rate)}</span><span>{formatCurrency(tax, currency)}</span></div>
+          <div className="flex justify-between font-bold text-lg border-t pt-1"><span>Total</span><span>{formatCurrency(inv.total_amount, currency)}</span></div>
+          {paid > 0 && <div className="flex justify-between text-emerald-700"><span>Paid</span><span>{formatCurrency(paid, currency)}</span></div>}
+          {bal > 0 && paid > 0 && <div className="flex justify-between text-amber-700 font-medium"><span>Still owed</span><span>{formatCurrency(bal, currency)}</span></div>}
+        </div>
+        <div className="flex flex-wrap gap-2 mt-5">
+          <button onClick={onDownload} className="bg-teal-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-teal-800">Download PDF</button>
+          <button onClick={onSend} className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-gray-50">Send</button>
+          {bal > 0
+            ? <button onClick={onMarkPaid} className="bg-emerald-600 text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-emerald-700">Mark as paid</button>
+            : <span className="inline-flex items-center text-sm font-semibold text-emerald-700">✓ Paid</span>}
+        </div>
+        <div className="mt-5 border-t border-gray-100 pt-4">
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Invoice activity</div>
+          <ol className="relative border-l border-gray-200 ml-1.5 space-y-3">
+            {activity.map((ev,i)=>(
+              <li key={ev.key + i} className="ml-4">
+                <span className="absolute -left-1.5 mt-1 w-3 h-3 rounded-full bg-teal-600 border-2 border-white"></span>
+                <div className="text-sm font-medium">{ev.label}</div>
+                <div className="text-[11px] text-gray-500">{fmtDay(ev.date)} · {ev.date}</div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
     </div>
   )
 }

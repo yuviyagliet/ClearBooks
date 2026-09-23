@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ClearBooks — Prism CB Identity Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',system-ui,sans-serif;background:#020617;color:#F1F5F9;min-height:100vh}
+  header{padding:48px 40px 20px;max-width:1200px;margin:0 auto}
+  header h1{font-size:13px;letter-spacing:5px;font-weight:600;color:#5EEAD4;text-transform:uppercase;margin-bottom:12px}
+  header p{font-size:28px;font-weight:300;letter-spacing:-0.04em;line-height:1.2}
+  header p b{font-weight:600}
+  header p span{color:#94A3B8;font-size:15px;display:block;margin-top:10px;font-weight:400;letter-spacing:0.02em}
+  .grid{max-width:1200px;margin:32px auto;padding:0 40px;display:grid;grid-template-columns:1.1fr 1.4fr;gap:28px}
+  .card{background:#0F172A;border:1px solid rgba(255,255,255,0.06);border-radius:24px;padding:28px;position:relative;overflow:hidden}
+  .card.light{background:#F8FAFC;border-color:#E2E8F0}
+  .card h2{font-size:11px;letter-spacing:3px;font-weight:600;color:#64748B;text-transform:uppercase;margin-bottom:18px}
+  .card .art{display:flex;align-items:center;justify-content:center;min-height:260px}
+  .card .art.darkBg{background:transparent}
+  .swatches{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+  .sw{flex:1;min-width:120px;border-radius:12px;padding:12px 14px;border:1px solid rgba(255,255,255,0.08)}
+  .sw b{display:block;font-size:11px;letter-spacing:1px;font-weight:600;margin-bottom:4px}
+  .sw span{font-size:10px;color:#94A3B8;letter-spacing:0.5px}
+  .dot{width:22px;height:22px;border-radius:50%;margin-bottom:8px;border:1px solid rgba(255,255,255,0.1)}
+  .specs{margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.06);display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .specs div h3{font-size:10px;letter-spacing:2px;color:#64748B;font-weight:600;margin-bottom:6px}
+  .specs div p{font-size:12px;line-height:1.6;color:#CBD5E1}
+  .lockups{max-width:1200px;margin:0 auto;padding:0 40px 40px}
+  .lockups .pair{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:20px}
+  pre{margin-top:14px;background:#020617;border:1px solid #1E293B;border-radius:12px;padding:14px 16px;font-size:11px;line-height:1.7;color:#94A3B8;overflow:auto}
+  .tag{display:inline-block;font-size:9px;letter-spacing:2px;font-weight:700;padding:6px 10px;border-radius:999px;background:rgba(94,234,212,0.12);color:#5EEAD4;border:1px solid rgba(94,234,212,0.22);margin-bottom:12px}
+  footer{max-width:1200px;margin:0 auto;padding:24px 40px 48px;color:#475569;font-size:11px;letter-spacing:0.5px;line-height:1.7}
+  img{max-width:100%;height:auto;display:block}
+  @media(max-width:900px){.grid,.lockups .pair{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>ClearBooks Identity — Prism Concept</h1>
+  <p>Luxury precision for creative studios. <b>Clarity, cut like a diamond.</b>
+  <span>Midnight Slate #0F172A → Electric Emerald #00E6A0 → Vivid Cyan #06B6D4 &nbsp;•&nbsp; All vectors crisp, chamfered 8px, 0.9px prism seams</span></p>
+</header>
+
+<div class="grid">
+  <div class="card">
+    <h2>Primary App Icon — Midnight Slate</h2>
+    <div class="art">
+      <img src="./clearbooks-icon-primary.svg" width="320" height="320" alt="ClearBooks primary icon" style="width:min(320px,70%);filter:drop-shadow(0 20px 40px rgba(2,6,23,0.6))"/>
+    </div>
+    <div class="swatches">
+      <div class="sw" style="background:#0F172A"><div class="dot" style="background:#0F172A"></div><b style="color:#F1F5F9">MIDNIGHT SLATE</b><span>#0F172A — background</span></div>
+      <div class="sw" style="background:linear-gradient(135deg,#00E6A0,#06B6D4)"><div class="dot" style="background:linear-gradient(135deg,#00E6A0,#06B6D4)"></div><b style="color:#0F172A">ELECTRIC EMERALD → CYAN</b><span>gradient facets</span></div>
+      <div class="sw" style="background:#020617"><b style="color:#5EEAD4">PRISM SEAM</b><span>0.9px white 16% + 1.7px highlight</span></div>
+    </div>
+    <div class="specs">
+      <div><h3>Construction</h3><p>C: 32→58w ×64h, 8px chamfer outer, 90° inner. B: two diamond-loops 18w ×26h, gap 12px. Shared spine at x=48.</p></div>
+      <div><h3>Usage</h3><p>App icon, favicon, social avatar, loading mark. Keep clear space = 0.5× mark height. Min size 20px.</p></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Detail — Vector-Perfect Prism</h2>
+    <div class="art" style="background:#0F172A;border-radius:20px;border:1px solid rgba(255,255,255,0.06);padding:22px">
+      <img src="./clearbooks-mark.svg" width="180" height="200" alt="Mark transparent zoom" style="width:180px"/>
+    </div>
+    <pre>public/clearbooks-icon-primary.svg   — primary (dark bg)
+public/clearbooks-mark.svg             — transparent mark
+public/clearbooks-icon-light.svg       — light bg variant
+public/clearbooks-logo-horizontal.svg  — horizontal lockup
+public/clearbooks-logo-vertical.svg    — vertical lockup</pre>
+    <div class="specs">
+      <div><h3>Vibe</h3><p>Apple × Stripe luxury. No generic book/coin. Sharp miter joins, no rounded corners, no blur — pure vector geometry.</p></div>
+      <div><h3>Prism Idea</h3><p>Three facets (C, B-top, B-bottom) refract one gradient. Vertical spine = light split. Counters = clarity.</p></div>
+    </div>
+  </div>
+</div>
+
+<div class="lockups">
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:28px 28px 0"><h2>Horizontal Lockup — Luxury Tech Wordmark</h2></div>
+    <div class="art" style="padding:10px 28px 28px;min-height:auto">
+      <img src="./clearbooks-logo-horizontal.svg" alt="Horizontal lockup"/>
+    </div>
+  </div>
+  <div class="pair">
+    <div class="card light">
+      <h2>Light Background — Slate Ink</h2>
+      <div class="art" style="min-height:200px"><img src="./clearbooks-icon-light.svg" width="220" height="220" alt="Light variant"/></div>
+    </div>
+    <div class="card">
+      <h2>Vertical Lockup — Studio Stationery</h2>
+      <div class="art" style="min-height:200px"><img src="./clearbooks-logo-vertical.svg" width="320" alt="Vertical lockup"/></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:28px">
+    <div class="tag">Implementation Notes</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;font-size:12px;line-height:1.7;color:#CBD5E1">
+      <p><b style="color:#F1F5F9">Typography:</b> “Clear” Light 300 + “Books” SemiBold 600, tracking -1.4, Inter / SF Pro Display. Tagline 9.5pt, tracking 4.2, Slate-400. Perfect for creative studios — soft luxury, not corporate.</p>
+      <p><b style="color:#F1F5F9">How it reads:</b> At a glance it’s a geometric “C”. On second look the two diamond facets on the right form “B” — the spine is shared. The counter cut-outs ensure instant legibility at 20px.</p>
+      <p><b style="color:#F1F5F9">No icon clichés:</b> Zero books, coins, calculators. The prism/diamond chamfers themselves are the metaphor — clarity & precision.</p>
+      <p><b style="color:#F1F5F9">Files:</b> All SVGs use pure vectors, <code>shape-rendering: geometricPrecision</code>, integer coordinates, miter joins. Replace counter fill (#0F172A ↔ #F8FAFC) to swap dark/light.</p>
+    </div>
+  </div>
+</div>
+
+<footer>
+  © ClearBooks — Designed as minimalist high-end luxury tech. Midnight Slate #0F172A, Electric Emerald #00E6A0, Vivid Cyan #06B6D4/#22D3EE. Prism spine 0.9px, chamfer 8px, facet gradient 3-tone. Ready for app, web, print, emboss.
+</footer>
+</body>
+</html>

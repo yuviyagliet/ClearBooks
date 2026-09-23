@@ -1,0 +1,48 @@
+<svg width="720" height="160" viewBox="0 0 720 160" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>ClearBooks — Horizontal Lockup</title>
+<desc>Luxury tech wordmark for creative studios — Prism CB + ClearBooks logotype on Midnight Slate</desc>
+<rect width="720" height="160" rx="28" fill="#0F172A"/>
+<defs>
+  <linearGradient id="gradC2" x1="16" y1="50" x2="48" y2="50" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="#00E6A0"/>
+    <stop offset="52%" stop-color="#00D1B7"/>
+    <stop offset="100%" stop-color="#06B6D4"/>
+  </linearGradient>
+  <linearGradient id="gradBT2" x1="48" y1="31" x2="74" y2="31" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="#00E8AC"/>
+    <stop offset="100%" stop-color="#22D3EE"/>
+  </linearGradient>
+  <linearGradient id="gradBB2" x1="48" y1="69" x2="74" y2="69" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="#0BB88F"/>
+    <stop offset="100%" stop-color="#0EA5E9"/>
+  </linearGradient>
+  <filter id="sh2" x="-40%" y="-40%" width="180%" height="180%">
+    <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#020617" flood-opacity="0.45"/>
+  </filter>
+</defs>
+
+<!-- ICON — 64x64 prism CB, vertically centered -->
+<g transform="translate(48, 48)" filter="url(#sh2)">
+  <!-- scale 0.64? Actually original mark 58w x64h. Need 64h => scale 1. At 64h, position 48,48 gives 16+48 offset. Good. -->
+  <g transform="scale(1)">
+    <path d="M 24 18 L 48 18 L 48 32 L 32 32 L 32 68 L 48 68 L 48 82 L 24 82 L 16 74 L 16 26 Z" fill="url(#gradC2)"/>
+    <path d="M 48 18 L 66 18 L 74 26 L 74 36 L 66 44 L 48 44 Z" fill="url(#gradBT2)"/>
+    <path d="M 48 56 L 66 56 L 74 64 L 74 74 L 66 82 L 48 82 Z" fill="url(#gradBB2)"/>
+    <path d="M 54.5 26 L 62 26 L 67.2 30 L 67.2 34 L 62 38 L 54.5 38 Z" fill="#0F172A"/>
+    <path d="M 54.5 62 L 62 62 L 67.2 66 L 67.2 70 L 62 74 L 54.5 74 Z" fill="#0F172A"/>
+    <line x1="48" y1="18" x2="48" y2="82" stroke="white" stroke-opacity="0.15" stroke-width="0.9"/>
+    <line x1="48" y1="18" x2="48" y2="82" stroke="white" stroke-opacity="0.06" stroke-width="2.2"/>
+  </g>
+</g>
+
+<!-- WORDMARK -->
+<g font-family="'Inter', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" text-rendering="geometricPrecision">
+  <!-- ClearBooks -->
+  <text x="142" y="86" font-size="42" letter-spacing="-1.4" font-weight="300" fill="#F8FAFC">Clear<tspan font-weight="600" letter-spacing="-1.2">Books</tspan></text>
+  <!-- Tagline — luxury tech for creative studios -->
+  <text x="142.5" y="110" font-size="9.5" letter-spacing="4.2" font-weight="500" fill="#94A3B8" opacity="0.95">CREATIVE STUDIO • PRECISION FINANCE</text>
+</g>
+
+<!-- Refined divider dot between icon and text (prism accent) -->
+<circle cx="132" cy="80" r="1.4" fill="#00E6A0" opacity="0.9"/>
+</svg>

@@ -1,0 +1,52 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>ClearBooks — Prism CB Mark</title>
+<desc>Geometric C + B monogram with diamond-cut prism facets. Midnight Slate + Electric Emerald to Vivid Cyan.</desc>
+<rect width="200" height="200" rx="36" fill="#0F172A"/>
+<defs>
+  <linearGradient id="gradC" x1="16" y1="50" x2="48" y2="50" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="#00E6A0"/>
+    <stop offset="48%" stop-color="#00D0B6"/>
+    <stop offset="100%" stop-color="#06B6D4"/>
+  </linearGradient>
+  <linearGradient id="gradBTop" x1="48" y1="31" x2="74" y2="31" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="#00E8AC"/>
+    <stop offset="100%" stop-color="#22D3EE"/>
+  </linearGradient>
+  <linearGradient id="gradBBottom" x1="48" y1="69" x2="74" y2="69" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="#0DBF8A"/>
+    <stop offset="100%" stop-color="#0EA5E9"/>
+  </linearGradient>
+  <linearGradient id="hl" x1="48" y1="18" x2="48" y2="82" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="white" stop-opacity="0.20"/>
+    <stop offset="50%" stop-color="white" stop-opacity="0.05"/>
+    <stop offset="100%" stop-color="white" stop-opacity="0"/>
+  </linearGradient>
+  <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%">
+    <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#020617" flood-opacity="0.5"/>
+  </filter>
+</defs>
+
+<!-- Centered at 100,100 : mark bounds 16→74 (w58) 18→82 (h64), so translate 55,50 -->
+<g transform="translate(55,50)" filter="url(#shadow)">
+  <!-- C facet -->
+  <path d="M 24 18 L 48 18 L 48 32 L 32 32 L 32 68 L 48 68 L 48 82 L 24 82 L 16 74 L 16 26 Z" fill="url(#gradC)" stroke="white" stroke-opacity="0.07" stroke-width="0.75" stroke-linejoin="miter"/>
+  <!-- B top -->
+  <path d="M 48 18 L 66 18 L 74 26 L 74 36 L 66 44 L 48 44 Z" fill="url(#gradBTop)" stroke="white" stroke-opacity="0.08" stroke-width="0.75" stroke-linejoin="miter"/>
+  <!-- B bottom -->
+  <path d="M 48 56 L 66 56 L 74 64 L 74 74 L 66 82 L 48 82 Z" fill="url(#gradBBottom)" stroke="white" stroke-opacity="0.08" stroke-width="0.75" stroke-linejoin="miter"/>
+  <!-- B counters — clarity negative space -->
+  <path d="M 54.5 26 L 62 26 L 67.2 30 L 67.2 34 L 62 38 L 54.5 38 Z" fill="#0F172A"/>
+  <path d="M 54.5 62 L 62 62 L 67.2 66 L 67.2 70 L 62 74 L 54.5 74 Z" fill="#0F172A"/>
+  <!-- Prism spine — where C and B intersect -->
+  <line x1="48" y1="18" x2="48" y2="82" stroke="white" stroke-opacity="0.16" stroke-width="0.9"/>
+  <line x1="49.1" y1="18" x2="49.1" y2="82" stroke="url(#hl)" stroke-width="1.7"/>
+  <!-- Diamond-cut edge highlights -->
+  <path d="M 16 26 L 24 18" stroke="white" stroke-opacity="0.13" stroke-width="0.6"/>
+  <path d="M 16 74 L 24 82" stroke="white" stroke-opacity="0.13" stroke-width="0.6"/>
+  <path d="M 66 18 L 74 26" stroke="white" stroke-opacity="0.17" stroke-width="0.6"/>
+  <path d="M 66 44 L 74 36" stroke="white" stroke-opacity="0.10" stroke-width="0.6"/>
+  <path d="M 66 56 L 74 64" stroke="white" stroke-opacity="0.10" stroke-width="0.6"/>
+  <path d="M 66 82 L 74 74" stroke="white" stroke-opacity="0.17" stroke-width="0.6"/>
+</g>
+<ellipse cx="100" cy="186" rx="34" ry="5" fill="white" opacity="0.035"/>
+</svg>

@@ -1,0 +1,27 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>ClearBooks — Light Background Variant</title>
+<rect width="200" height="200" rx="36" fill="#F8FAFC"/>
+<rect width="200" height="200" rx="36" fill="none" stroke="#E2E8F0" stroke-width="1"/>
+<defs>
+  <linearGradient id="lC" x1="16" y1="50" x2="48" y2="50" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="#00C38A"/><stop offset="55%" stop-color="#06B6D4"/><stop offset="100%" stop-color="#0E7490"/>
+  </linearGradient>
+  <linearGradient id="lBT" x1="48" y1="31" x2="74" y2="31" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="#00C98B"/><stop offset="100%" stop-color="#06B6D4"/>
+  </linearGradient>
+  <linearGradient id="lBB" x1="48" y1="69" x2="74" y2="69" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="#0AB186"/><stop offset="100%" stop-color="#0E7490"/>
+  </linearGradient>
+  <filter id="lsh" x="-40%" y="-40%" width="180%" height="180%">
+    <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0F172A" flood-opacity="0.12"/>
+  </filter>
+</defs>
+<g transform="translate(55,50)" filter="url(#lsh)">
+  <path d="M 24 18 L 48 18 L 48 32 L 32 32 L 32 68 L 48 68 L 48 82 L 24 82 L 16 74 L 16 26 Z" fill="url(#lC)"/>
+  <path d="M 48 18 L 66 18 L 74 26 L 74 36 L 66 44 L 48 44 Z" fill="url(#lBT)"/>
+  <path d="M 48 56 L 66 56 L 74 64 L 74 74 L 66 82 L 48 82 Z" fill="url(#lBB)"/>
+  <path d="M 54.5 26 L 62 26 L 67.2 30 L 67.2 34 L 62 38 L 54.5 38 Z" fill="#F8FAFC"/>
+  <path d="M 54.5 62 L 62 62 L 67.2 66 L 67.2 70 L 62 74 L 54.5 74 Z" fill="#F8FAFC"/>
+  <line x1="48" y1="18" x2="48" y2="82" stroke="#0F172A" stroke-opacity="0.10" stroke-width="0.9"/>
+</g>
+</svg>

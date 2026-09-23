@@ -22,8 +22,16 @@ export default function Landing(){
       {/* subtle grid */}
       <div className="pointer-events-none absolute inset-0 opacity-[0.03]" style={{ backgroundImage:'linear-gradient(rgba(255,255,255,0.55) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.55) 1px, transparent 1px)', backgroundSize:'32px 32px' }} aria-hidden />
 
-      <header className="relative max-w-6xl mx-auto px-6 py-5 flex items-center justify-between border-b border-white/5">
-        <div className="flex items-center gap-2.5 font-bold text-lg text-[#e2e8f0] tracking-[0.025em] leading-none" style={{ color:'#e2e8f0', opacity:1, fontWeight:700, letterSpacing:'0.025em' }}><span className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#06b6d4] to-[#0891b2] text-white grid place-items-center shadow-[0_4px_16px_rgba(6,182,214,0.35)] border border-white/10 shrink-0">◈</span><span className="inline-flex items-center">ClearBooks</span></div>
+      <header className="sticky top-0 z-20 max-w-6xl mx-auto px-6 py-4 flex items-center justify-between border-b border-white/10 backdrop-blur-md" style={{ background:'rgba(2,6,23,0.55)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)' }}>
+        <Link to="/" className="flex items-center leading-none" style={{ gap:'12px' }}>
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+            <rect width="40" height="40" rx="10" fill="#06b6d4" fillOpacity="0.15" />
+            <path d="M20 8L32 20L20 32L8 20L20 8Z" stroke="#06b6d4" strokeWidth="2.5" strokeLinejoin="round" />
+            <path d="M20 13L27 20L20 27L13 20L20 13Z" fill="#06b6d4" fillOpacity="0.8" />
+            <path d="M20 8V32" stroke="#06b6d4" strokeWidth="1" strokeOpacity="0.5" />
+          </svg>
+          <span className="font-display bg-gradient-to-r from-white to-[#cbd5e1] bg-clip-text text-transparent tracking-tight inline-flex items-center" style={{ fontFamily:'Inter,Geist,system-ui,sans-serif', fontWeight:700, fontSize:'19px', letterSpacing:'-0.02em', opacity:1 }}>ClearBooks</span>
+        </Link>
         <div className="flex items-center gap-3">
           {user ? <Link to="/dashboard" onClick={handleHeaderCta} className="text-sm font-medium border border-white/10 bg-white/5 backdrop-blur text-[#e2e8f0] rounded-full px-4 py-2 hover:bg-white/10 hover:border-white/15 transition">Go to dashboard</Link>
           : <>

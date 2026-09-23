@@ -46,18 +46,15 @@ export default function Layout({ children }){
         {/* Aurora top */}
         <div className="absolute inset-x-0 top-0 h-[280px] pointer-events-none opacity-[0.12]" style={{ background: 'radial-gradient(600px 220px at 40% 0%, rgba(6,182,214,0.32), transparent 70%), radial-gradient(520px 200px at 90% 12%, rgba(16,185,129,0.22), transparent 70%)' }} aria-hidden />
 
-        <div className="relative px-6 pt-7 pb-6 border-b border-slate-200/70 bg-white/95 backdrop-blur-xl">
-          <Link to="/dashboard" className="flex items-center gap-3 group">
-            <span className="w-9 h-9 rounded-xl grid place-items-center text-[13px] font-bold shrink-0 relative overflow-hidden"
-              style={{
-                background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 55%, #0e7490 100%)',
-                boxShadow: '0 4px 16px rgba(6,182,214,0.35), inset 0 1px 0 rgba(255,255,255,0.22)',
-                border: '1px solid rgba(255,255,255,0.14)'
-              }}>
-              <span className="relative text-white drop-shadow">◈</span>
-              <span className="absolute inset-0 bg-gradient-to-tr from-white/12 to-transparent pointer-events-none" />
-            </span>
-            <span className="font-display font-semibold text-[17px] leading-none inline-flex items-center text-[#0f172a] opacity-100 tracking-[0.025em] transition" style={{ color:'#0f172a', opacity:1, fontWeight:700, letterSpacing:'0.025em' }}>ClearBooks</span>
+        <div className="relative px-6 pt-7 pb-6 border-b border-white/10 bg-white/[0.02] backdrop-blur-md">
+          <Link to="/dashboard" className="flex items-center gap-3 group" style={{ gap:'12px' }}>
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+              <rect width="40" height="40" rx="10" fill="#06b6d4" fillOpacity="0.15" />
+              <path d="M20 8L32 20L20 32L8 20L20 8Z" stroke="#06b6d4" strokeWidth="2.5" strokeLinejoin="round" />
+              <path d="M20 13L27 20L20 27L13 20L20 13Z" fill="#06b6d4" fillOpacity="0.8" />
+              <path d="M20 8V32" stroke="#06b6d4" strokeWidth="1" strokeOpacity="0.5" />
+            </svg>
+            <span className="font-display bg-gradient-to-r from-white to-[#cbd5e1] bg-clip-text text-transparent tracking-tight leading-none inline-flex items-center" style={{ fontFamily:'Inter,Geist,system-ui,sans-serif', fontWeight:700, fontSize:'18px', letterSpacing:'-0.02em', opacity:1 }}>ClearBooks</span>
             <span className="ml-1 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
           </Link>
           <p className="text-[11px] text-slate-400 mt-2 tracking-[0.08em] font-medium uppercase">For colorists & post-production</p>
@@ -91,11 +88,19 @@ export default function Layout({ children }){
         </div>
       </aside>
 
-      {/* mobile top bar — glass (light for deep-slate wordmark contrast) */}
-      <div className="md:hidden sticky top-0 z-20 border-b border-slate-200/70" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>
+      {/* mobile top bar — premium studio header */}
+      <div className="md:hidden sticky top-0 z-20 border-b border-white/10 backdrop-blur-md" style={{ background: 'rgba(15,23,42,0.72)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
         <div className="flex items-center justify-between px-4 py-3">
-          <Link to="/dashboard" className="font-display font-bold flex items-center gap-2.5 text-[#0f172a] opacity-100 tracking-[0.025em] leading-none" style={{ color:'#0f172a', opacity:1, fontWeight:700, letterSpacing:'0.025em' }}><span className="w-7 h-7 rounded-xl bg-gradient-to-br from-cyan-500 to-cyan-600 text-white grid place-items-center text-xs shadow-[0_4px_12px_rgba(6,182,214,0.35)] border border-white/15 shrink-0">◈</span><span className="inline-flex items-center">ClearBooks</span></Link>
-          <span className="text-[10px] bg-slate-900 text-white rounded-full px-2.5 py-1 font-bold tracking-wide uppercase">Studio</span>
+          <Link to="/dashboard" className="flex items-center gap-3 leading-none" style={{ gap:'12px' }}>
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0 w-8 h-8">
+              <rect width="40" height="40" rx="10" fill="#06b6d4" fillOpacity="0.15" />
+              <path d="M20 8L32 20L20 32L8 20L20 8Z" stroke="#06b6d4" strokeWidth="2.5" strokeLinejoin="round" />
+              <path d="M20 13L27 20L20 27L13 20L20 13Z" fill="#06b6d4" fillOpacity="0.8" />
+              <path d="M20 8V32" stroke="#06b6d4" strokeWidth="1" strokeOpacity="0.5" />
+            </svg>
+            <span className="font-display bg-gradient-to-r from-white to-[#cbd5e1] bg-clip-text text-transparent tracking-tight inline-flex items-center" style={{ fontFamily:'Inter,Geist,system-ui,sans-serif', fontWeight:700, fontSize:'16px', letterSpacing:'-0.02em', opacity:1 }}>ClearBooks</span>
+          </Link>
+          <span className="text-[10px] bg-white/10 text-[#e2e8f0] border border-white/10 rounded-full px-2.5 py-1 font-bold tracking-wide uppercase backdrop-blur">Studio</span>
         </div>
       </div>
 

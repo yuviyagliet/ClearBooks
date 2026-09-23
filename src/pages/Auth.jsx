@@ -102,7 +102,7 @@ export function ForgotPassword(){
   return (
     <div className="min-h-screen bg-[#f9fafb] grid place-items-center px-4 py-10">
       <div className="w-full max-w-md">
-        <Link to="/" className="flex items-center justify-center gap-2 font-bold text-lg mb-6"><span className="w-8 h-8 rounded-lg bg-teal-700 text-white grid place-items-center">◈</span> ClearBooks</Link>
+        <Link to="/" className="flex items-center justify-center gap-2.5 font-bold text-lg text-[#0f172a] opacity-100 tracking-[0.025em] leading-none" style={{ color:'#0f172a', opacity:1, fontWeight:700, letterSpacing:'0.025em' }}><span className="w-8 h-8 rounded-lg bg-teal-700 text-white grid place-items-center shrink-0">◈</span><span className="inline-flex items-center">ClearBooks</span></Link>
         <Card className="p-6 md:p-8">
           <h1 className="text-xl font-bold">Forgot password</h1>
           <p className="text-sm text-gray-500 mt-1">We’ll email you a reset link.</p>
@@ -146,7 +146,7 @@ export function UpdatePassword(){
   return (
     <div className="min-h-screen bg-[#f9fafb] grid place-items-center px-4 py-10">
       <div className="w-full max-w-md">
-        <Link to="/" className="flex items-center justify-center gap-2 font-bold text-lg mb-6"><span className="w-8 h-8 rounded-lg bg-teal-700 text-white grid place-items-center">◈</span> ClearBooks</Link>
+        <Link to="/" className="flex items-center justify-center gap-2.5 font-bold text-lg text-[#0f172a] opacity-100 tracking-[0.025em] leading-none" style={{ color:'#0f172a', opacity:1, fontWeight:700, letterSpacing:'0.025em' }}><span className="w-8 h-8 rounded-lg bg-teal-700 text-white grid place-items-center shrink-0">◈</span><span className="inline-flex items-center">ClearBooks</span></Link>
         <Card className="p-6 md:p-8">
           <h1 className="text-xl font-bold">Set new password</h1>
           <p className="text-sm text-gray-500 mt-1">Enter your new password below.</p>
@@ -167,7 +167,7 @@ function AuthShell({ title, subtitle, onSubmit, email, setEmail, password, setPa
   return (
     <div className="min-h-screen bg-[#f9fafb] grid place-items-center px-4 py-10">
       <div className="w-full max-w-md">
-        <Link to="/" className="flex items-center justify-center gap-2 font-bold text-lg mb-6"><span className="w-8 h-8 rounded-lg bg-teal-700 text-white grid place-items-center">◈</span> ClearBooks</Link>
+        <Link to="/" className="flex items-center justify-center gap-2.5 font-bold text-lg text-[#0f172a] opacity-100 tracking-[0.025em] leading-none" style={{ color:'#0f172a', opacity:1, fontWeight:700, letterSpacing:'0.025em' }}><span className="w-8 h-8 rounded-lg bg-teal-700 text-white grid place-items-center shrink-0">◈</span><span className="inline-flex items-center">ClearBooks</span></Link>
         <Card className="p-6 md:p-8">
           <h1 className="text-xl font-bold">{title}</h1>
           <p className="text-sm text-gray-500 mt-1">{subtitle}</p>

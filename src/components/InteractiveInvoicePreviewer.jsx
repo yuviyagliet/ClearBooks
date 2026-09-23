@@ -6,17 +6,14 @@ import { formatCurrency } from '../utils/helpers'
 import { track } from '../lib/analytics'
 import jsPDF from 'jspdf'
 
-// Guest-mode invoice previewer — no auth, no DB. Real-time HTML preview.
-// Download/Save is gated: guests see "Create a Free Account to Download".
+// Guest-mode invoice previewer — Studio Dark glassmorphic
 export default function InteractiveInvoicePreviewer(){
   const { user } = useAuth()
-  // Minimal but enough to feel real: client name + amount are the hero fields.
-  // We keep description + date for realism, but keep UX at 15 seconds.
   const [clientName, setClientName] = useState('Mira — Mosaic Pictures')
   const [amount, setAmount] = useState('2500')
   const [description, setDescription] = useState('Color grading — Project X')
   const [quantity, setQuantity] = useState('1')
-  const [rate, setRate] = useState('') // if empty, derive from amount
+  const [rate, setRate] = useState('')
   const [currency, setCurrency] = useState('$')
   const [taxType, setTaxType] = useState('none')
   const [taxRate, setTaxRate] = useState('18')
@@ -30,9 +27,7 @@ export default function InteractiveInvoicePreviewer(){
     }
   }
 
-  // Derived totals — live.
   const qty = Math.max(1, Number(quantity) || 1)
-  // If rate explicitly set, use it; else treat amount as total for the single line.
   const derivedRate = rate !== '' ? Number(rate) || 0 : (Number(amount) || 0) / qty
   const subtotal = useMemo(()=> Number((derivedRate * qty).toFixed(2)), [derivedRate, qty])
   const rateNum = (taxType === 'none' || taxType === 'exempt') ? 0 : (Number(taxRate) || 0)
@@ -58,7 +53,6 @@ export default function InteractiveInvoicePreviewer(){
   }
 
   const handleSaveClick = ()=>{
-    // Same gate — "Save" in guest mode means save to account (preserves draft for post-signup)
     if (!user) {
       try { localStorage.setItem('clearbooks_preview_draft', JSON.stringify({ clientName, amount, description, quantity, rate: derivedRate, currency, taxType, taxRate, total })) } catch {}
     }
@@ -100,50 +94,52 @@ export default function InteractiveInvoicePreviewer(){
   }
 
   return (
-    <section className="max-w-6xl mx-auto px-6 py-10">
+    <section className="relative max-w-6xl mx-auto px-6 py-10">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-6">
         <div>
-          <div className="inline-flex items-center gap-2 text-[11px] font-bold tracking-widest uppercase bg-teal-50 text-teal-700 border border-teal-200 rounded-full px-3 py-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-teal-600 animate-pulse" /> Interactive preview — no sign-up needed
+          <div className="inline-flex items-center gap-2 text-[11px] font-bold tracking-widest uppercase bg-[rgba(255,255,255,0.05)] text-cyan-200 border border-white/10 rounded-full px-3 py-1 backdrop-blur">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#06b6d4] animate-pulse shadow-[0_0_8px_#06b6d4]" /> Interactive preview — no sign-up needed
           </div>
-          <h2 className="font-display text-2xl md:text-[28px] font-bold tracking-tight text-slate-900 mt-3">See your invoice before you sign up</h2>
-          <p className="text-sm text-slate-600 mt-2 max-w-2xl leading-relaxed">Enter a client and amount — watch a premium, print-ready invoice appear instantly. Tweak it live. When you’re happy, create a free account to download or save it. Takes ~10 seconds.</p>
+          <h2 className="font-display text-2xl md:text-[28px] font-bold tracking-tight text-[#e2e8f0] mt-3">See your invoice before you sign up</h2>
+          <p className="text-sm text-[#e2e8f0]/65 mt-2 max-w-2xl leading-relaxed">Enter a client and amount — watch a premium, print-ready invoice appear instantly. Tweak it live. When you’re happy, create a free account to download or save it. Takes ~10 seconds.</p>
         </div>
-        <div className="text-xs text-slate-500 hidden md:block">Guest mode · Real-time PDF preview</div>
+        <div className="text-xs text-[#e2e8f0]/45 hidden md:block">Guest mode · Real-time PDF preview</div>
       </div>
 
       <div className="grid lg:grid-cols-5 gap-6 items-start">
-        {/* Form — guest inputs */}
-        <Card className="p-5 lg:col-span-2">
-          <h3 className="font-display font-semibold text-[15px]">Try it — your details</h3>
-          <p className="text-xs text-slate-500 mt-1">No account, no email. Just type and watch.</p>
+        {/* Glass form */}
+        <div className="lg:col-span-2 rounded-[20px] p-5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] backdrop-blur-lg" style={{ boxShadow:'0 16px 40px rgba(2,6,23,0.45), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+          <h3 className="font-display font-semibold text-[15px] text-[#e2e8f0]">Try it — your details</h3>
+          <p className="text-xs text-[#e2e8f0]/50 mt-1">No account, no email. Just type and watch.</p>
 
           <div className="mt-5 space-y-4">
             <div>
-              <Label htmlFor="preview-client">Client name *</Label>
+              <Label htmlFor="preview-client" className="text-[#e2e8f0]/70">Client name *</Label>
               <Input
                 id="preview-client"
                 value={clientName}
                 onChange={e=>{ setClientName(e.target.value); markInteract() }}
                 placeholder="Acme Studio"
                 autoComplete="off"
+                className="mt-1.5 bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[#e2e8f0] placeholder:text-[#e2e8f0]/35 focus:border-[#06b6d4] focus:ring-[#06b6d4]/30"
               />
-              <p className="text-[11px] text-slate-400 mt-1">Who you’re billing — appears in “Bill to”.</p>
+              <p className="text-[11px] text-[#e2e8f0]/40 mt-1">Who you’re billing — appears in “Bill to”.</p>
             </div>
 
             <div>
-              <Label htmlFor="preview-desc">Project / Description</Label>
+              <Label htmlFor="preview-desc" className="text-[#e2e8f0]/70">Project / Description</Label>
               <Input
                 id="preview-desc"
                 value={description}
                 onChange={e=>{ setDescription(e.target.value); markInteract() }}
                 placeholder="Color grading — Project X"
+                className="mt-1.5 bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[#e2e8f0] placeholder:text-[#e2e8f0]/35 focus:border-[#06b6d4] focus:ring-[#06b6d4]/30"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="preview-amount">Amount ({currency}) *</Label>
+                <Label htmlFor="preview-amount" className="text-[#e2e8f0]/70">Amount ({currency}) *</Label>
                 <Input
                   id="preview-amount"
                   type="number"
@@ -152,12 +148,13 @@ export default function InteractiveInvoicePreviewer(){
                   value={amount}
                   onChange={e=>{ setAmount(e.target.value); setRate(''); markInteract() }}
                   placeholder="2500"
+                  className="mt-1.5 bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[#e2e8f0] focus:border-[#06b6d4] focus:ring-[#06b6d4]/30"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">Total before tax. Live in preview →</p>
+                <p className="text-[11px] text-[#e2e8f0]/40 mt-1">Total before tax. Live →</p>
               </div>
               <div>
-                <Label htmlFor="preview-currency">Currency</Label>
-                <Select id="preview-currency" value={currency} onChange={e=> setCurrency(e.target.value)}>
+                <Label htmlFor="preview-currency" className="text-[#e2e8f0]/70">Currency</Label>
+                <Select id="preview-currency" value={currency} onChange={e=> setCurrency(e.target.value)} className="mt-1.5 bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[#e2e8f0] focus:border-[#06b6d4] focus:ring-[#06b6d4]/30">
                   <option value="$">$ — USD</option>
                   <option value="₹">₹ — INR</option>
                   <option value="€">€ — EUR</option>
@@ -167,13 +164,13 @@ export default function InteractiveInvoicePreviewer(){
               </div>
             </div>
 
-            <details className="rounded-xl border border-gray-100 bg-gray-50/50 p-3">
-              <summary className="text-xs font-semibold text-slate-700 cursor-pointer select-none">Advanced: quantity, rate & tax</summary>
+            <details className="rounded-xl border border-white/10 bg-white/5 backdrop-blur p-3">
+              <summary className="text-xs font-semibold text-[#e2e8f0]/80 cursor-pointer select-none">Advanced: quantity, rate & tax</summary>
               <div className="grid grid-cols-3 gap-3 mt-3">
-                <div><Label htmlFor="preview-qty">Qty</Label><Input id="preview-qty" type="number" min="1" step="1" value={quantity} onChange={e=>{ setQuantity(e.target.value); markInteract() }} /></div>
-                <div><Label htmlFor="preview-rate">Rate</Label><Input id="preview-rate" type="number" min="0.01" step="0.01" placeholder="auto" value={rate} onChange={e=> setRate(e.target.value)} /></div>
-                <div><Label htmlFor="preview-tax">Tax</Label>
-                  <Select id="preview-tax" value={taxType} onChange={e=> setTaxType(e.target.value)}>
+                <div><Label htmlFor="preview-qty" className="text-[#e2e8f0]/60">Qty</Label><Input id="preview-qty" type="number" min="1" step="1" value={quantity} onChange={e=>{ setQuantity(e.target.value); markInteract() }} className="mt-1 bg-[rgba(255,255,255,0.06)] border-white/10 text-[#e2e8f0] focus:border-[#06b6d4]" /></div>
+                <div><Label htmlFor="preview-rate" className="text-[#e2e8f0]/60">Rate</Label><Input id="preview-rate" type="number" min="0.01" step="0.01" placeholder="auto" value={rate} onChange={e=> setRate(e.target.value)} className="mt-1 bg-[rgba(255,255,255,0.06)] border-white/10 text-[#e2e8f0] placeholder:text-[#e2e8f0]/30 focus:border-[#06b6d4]" /></div>
+                <div><Label htmlFor="preview-tax" className="text-[#e2e8f0]/60">Tax</Label>
+                  <Select id="preview-tax" value={taxType} onChange={e=> setTaxType(e.target.value)} className="mt-1 bg-[rgba(255,255,255,0.06)] border-white/10 text-[#e2e8f0] focus:border-[#06b6d4]">
                     <option value="none">No tax</option>
                     <option value="gst">GST</option>
                     <option value="vat">VAT</option>
@@ -183,146 +180,142 @@ export default function InteractiveInvoicePreviewer(){
                 </div>
               </div>
               {(taxType !== 'none' && taxType !== 'exempt') && (
-                <div className="mt-3"><Label htmlFor="preview-rate-pct">Tax rate %</Label><Input id="preview-rate-pct" type="number" min="0" max="100" step="0.1" value={taxRate} onChange={e=> setTaxRate(e.target.value)} /></div>
+                <div className="mt-3"><Label htmlFor="preview-rate-pct" className="text-[#e2e8f0]/60">Tax rate %</Label><Input id="preview-rate-pct" type="number" min="0" max="100" step="0.1" value={taxRate} onChange={e=> setTaxRate(e.target.value)} className="mt-1 bg-[rgba(255,255,255,0.06)] border-white/10 text-[#e2e8f0] focus:border-[#06b6d4]" /></div>
               )}
             </details>
 
             <div className="flex flex-wrap gap-2 pt-1">
               <button
                 onClick={handleDownloadClick}
-                className="flex-1 min-w-[140px] bg-teal-700 text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-teal-800 hover:shadow-md hover:-translate-y-[1px] active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 min-w-[140px] bg-[#06b6d4] text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-[#0891b2] hover:shadow-[0_8px_24px_rgba(6,182,214,0.38)] hover:-translate-y-[1px] active:scale-[0.98] transition disabled:opacity-50 border border-white/10 shadow-[0_8px_20px_rgba(6,182,214,0.28)]"
                 disabled={!canDownload}
               >
                 ⬇ Download PDF
               </button>
               <button
                 onClick={handleSaveClick}
-                className="bg-white border border-gray-200 rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-gray-50 hover:border-gray-300 transition"
+                className="bg-white/5 border border-white/10 rounded-xl px-5 py-2.5 text-sm font-semibold text-[#e2e8f0] hover:bg-white/10 hover:border-white/15 transition"
               >
                 Save Invoice
               </button>
             </div>
-            <p className="text-[11px] text-slate-400 text-center">Download & Save require a free account — preview is unlimited.</p>
+            <p className="text-[11px] text-[#e2e8f0]/40 text-center">Download & Save require a free account — preview is unlimited.</p>
           </div>
-        </Card>
+        </div>
 
-        {/* Live preview — looks like PDF */}
+        {/* Glowing floating preview */}
         <div className="lg:col-span-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500">Live preview</span>
-            <span className="text-[11px] text-slate-400">Updates as you type · Print-ready</span>
+            <span className="text-[11px] font-semibold tracking-widest uppercase text-[#e2e8f0]/60">Live preview</span>
+            <span className="text-[11px] text-[#e2e8f0]/45">Updates as you type · Print-ready</span>
           </div>
 
-          <Card className="overflow-hidden p-0">
-            {/* Paper */}
-            <div className="bg-white p-6 md:p-7">
-              {/* Header */}
+          <div className="rounded-[20px] overflow-hidden bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] backdrop-blur-lg relative" style={{ boxShadow:'0 24px 64px rgba(2,6,23,0.55), 0 0 40px rgba(6,182,214,0.14), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+            <div className="pointer-events-none absolute -inset-[1px] rounded-[20px] opacity-60" style={{ background:'radial-gradient(600px 220px at 70% 0%, rgba(6,182,214,0.16), transparent 65%)' }} aria-hidden />
+            <div className="relative bg-[rgba(255,255,255,0.02)] p-6 md:p-7">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-700 to-teal-600 text-white grid place-items-center text-xs shadow">◈</div>
-                  <div className="font-display font-bold text-[13px] tracking-tight mt-2">Your Studio</div>
-                  <div className="text-[11px] text-slate-500">hello@yourstudio.co · +1 555 0100</div>
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#06b6d4] to-[#0891b2] text-white grid place-items-center text-xs shadow-[0_4px_16px_rgba(6,182,214,0.32)] border border-white/10">◈</div>
+                  <div className="font-display font-bold text-[13px] tracking-tight mt-2 text-[#e2e8f0]">Your Studio</div>
+                  <div className="text-[11px] text-[#e2e8f0]/60">hello@yourstudio.co · +1 555 0100</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[10px] tracking-widest uppercase font-bold text-slate-500">Invoice</div>
-                  <div className="font-mono font-bold text-lg tracking-tight">{invoiceNumber}</div>
-                  <div className="text-[11px] text-slate-500 mt-1">Issue: {issueDate} · Due: {dueDate}</div>
-                  <span className="inline-flex mt-1.5 text-[10px] font-bold border rounded-full px-2 py-0.5 bg-emerald-50 text-emerald-700 border-emerald-200">Preview</span>
+                  <div className="text-[10px] tracking-widest uppercase font-bold text-[#e2e8f0]/50">Invoice</div>
+                  <div className="font-mono font-bold text-lg tracking-tight text-[#e2e8f0]">{invoiceNumber}</div>
+                  <div className="text-[11px] text-[#e2e8f0]/60 mt-1">Issue: {issueDate} · Due: {dueDate}</div>
+                  <span className="inline-flex mt-1.5 text-[10px] font-bold border rounded-full px-2 py-0.5 bg-emerald-500/15 text-emerald-200 border-emerald-500/20">Preview</span>
                 </div>
               </div>
 
               <div className="mt-6">
-                <div className="text-[11px] tracking-widest uppercase font-bold text-slate-500">Bill to</div>
-                <div className="font-semibold text-[14px] text-slate-900 mt-1">{clientName.trim() || 'Client name'}</div>
-                <div className="text-xs text-slate-500">Client will see this exactly as typed.</div>
+                <div className="text-[11px] tracking-widest uppercase font-bold text-[#e2e8f0]/50">Bill to</div>
+                <div className="font-semibold text-[14px] text-[#e2e8f0] mt-1">{clientName.trim() || 'Client name'}</div>
+                <div className="text-xs text-[#e2e8f0]/50">Client will see this exactly as typed.</div>
               </div>
 
-              <div className="mt-6 border border-gray-200 rounded-xl overflow-hidden">
-                <div className="grid grid-cols-12 bg-slate-50 text-[11px] font-semibold tracking-wide uppercase text-slate-500 px-4 py-2">
+              <div className="mt-6 border border-white/10 rounded-xl overflow-hidden bg-white/5 backdrop-blur">
+                <div className="grid grid-cols-12 bg-white/5 text-[11px] font-semibold tracking-wide uppercase text-[#e2e8f0]/60 px-4 py-2 border-b border-white/10">
                   <span className="col-span-6">Description</span>
                   <span className="col-span-2 text-center">Qty</span>
                   <span className="col-span-2 text-right">Rate</span>
                   <span className="col-span-2 text-right">Total</span>
                 </div>
-                <div className="grid grid-cols-12 px-4 py-3 text-sm items-center">
+                <div className="grid grid-cols-12 px-4 py-3 text-sm items-center text-[#e2e8f0]">
                   <span className="col-span-6 truncate pr-2">{description || 'Service'}</span>
-                  <span className="col-span-2 text-center font-mono text-xs">{qty}</span>
-                  <span className="col-span-2 text-right font-mono text-xs">{formatCurrency(derivedRate, currency)}</span>
-                  <span className="col-span-2 text-right font-semibold">{formatCurrency(subtotal, currency)}</span>
+                  <span className="col-span-2 text-center font-mono text-xs text-[#e2e8f0]/70">{qty}</span>
+                  <span className="col-span-2 text-right font-mono text-xs text-[#e2e8f0]/70">{formatCurrency(derivedRate, currency)}</span>
+                  <span className="col-span-2 text-right font-semibold text-[#e2e8f0]">{formatCurrency(subtotal, currency)}</span>
                 </div>
               </div>
 
               <div className="mt-4 max-w-[260px] ml-auto space-y-1.5 text-sm">
-                <div className="flex justify-between text-slate-600"><span>Subtotal</span><span className="font-mono">{formatCurrency(subtotal, currency)}</span></div>
-                <div className="flex justify-between text-slate-600">
+                <div className="flex justify-between text-[#e2e8f0]/70"><span>Subtotal</span><span className="font-mono text-[#e2e8f0]">{formatCurrency(subtotal, currency)}</span></div>
+                <div className="flex justify-between text-[#e2e8f0]/70">
                   <span>{taxType === 'exempt' ? 'Tax exempt' : taxType === 'none' || rateNum===0 ? 'No tax' : `${taxType.toUpperCase()} (${rateNum}%)`}</span>
-                  <span className="font-mono">{formatCurrency(taxAmount, currency)}</span>
+                  <span className="font-mono text-[#e2e8f0]">{formatCurrency(taxAmount, currency)}</span>
                 </div>
-                <div className="flex justify-between font-bold text-[15px] border-t border-gray-200 pt-2 mt-2">
+                <div className="flex justify-between font-bold text-[15px] border-t border-white/15 pt-2 mt-2 text-[#e2e8f0]">
                   <span>Total</span><span className="font-mono">{formatCurrency(total, currency)}</span>
                 </div>
-                <p className="text-[11px] text-slate-400 text-right">Professional PDF — no watermarks.</p>
+                <p className="text-[11px] text-[#e2e8f0]/45 text-right">Professional PDF — no watermarks.</p>
               </div>
 
-              {/* Watermark hint for guest */}
               {!user && (
-                <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
-                  <span className="text-amber-600 mt-0.5">✦</span>
+                <div className="mt-6 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-start gap-2 backdrop-blur">
+                  <span className="text-amber-300 mt-0.5">✦</span>
                   <div className="text-xs leading-relaxed">
-                    <span className="font-semibold text-amber-900">Preview mode</span><span className="text-amber-800"> — this is exactly what your client will receive. Create a free account to download & keep it saved.</span>
+                    <span className="font-semibold text-amber-200">Preview mode</span><span className="text-amber-200/75"> — this is exactly what your client will receive. Create a free account to download & keep it saved.</span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Footer actions inside preview */}
-            <div className="bg-slate-50 border-t border-gray-200 p-3 flex flex-wrap gap-2 justify-end">
-              <span className="text-[11px] text-slate-500 mr-auto self-center hidden md:block">Want this as PDF? One click after sign-up.</span>
-              <button onClick={handleDownloadClick} className="bg-slate-900 text-white rounded-xl px-4 py-2 text-xs font-semibold hover:bg-black transition">Download PDF</button>
-              <button onClick={handleSaveClick} className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-xs font-semibold hover:bg-gray-50 transition">Save to account</button>
+            <div className="bg-white/[0.04] border-t border-white/10 p-3 flex flex-wrap gap-2 justify-end backdrop-blur">
+              <span className="text-[11px] text-[#e2e8f0]/45 mr-auto self-center hidden md:block">Want this as PDF? One click after sign-up.</span>
+              <button onClick={handleDownloadClick} className="bg-[#06b6d4] text-white rounded-xl px-4 py-2 text-xs font-semibold hover:bg-[#0891b2] border border-white/10 shadow-[0_4px_16px_rgba(6,182,214,0.28)]">Download PDF</button>
+              <button onClick={handleSaveClick} className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs font-semibold text-[#e2e8f0] hover:bg-white/10">Save to account</button>
             </div>
-          </Card>
+          </div>
 
-          <p className="text-[11px] text-center text-slate-400 mt-3">Used by colorists & editors — no bloat, just money in & out. <Link to="/signup" className="text-teal-700 font-medium hover:underline">Create free account →</Link></p>
+          <p className="text-[11px] text-center text-[#e2e8f0]/40 mt-3">Used by colorists & editors — no bloat, just money in & out. <Link to="/signup" className="text-[#06b6d4] font-medium hover:text-cyan-300">Create free account →</Link></p>
         </div>
       </div>
 
-      {/* Gate modal — only on download/save attempt by guest */}
       {showGate && !user && (
         <div className="fixed inset-0 z-50 grid place-items-center p-4">
-          <button aria-label="Close" onClick={()=> setShowGate(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-          <Card className="relative w-full max-w-md p-6 md:p-7 shadow-2xl">
-            <div className="w-10 h-10 rounded-xl bg-teal-700 text-white grid place-items-center mx-auto">◈</div>
-            <h3 className="font-display font-bold text-lg text-center mt-3 tracking-tight">Create a Free Account to Download</h3>
-            <p className="text-sm text-slate-600 text-center mt-2 leading-relaxed">
-              Your preview for <span className="font-semibold text-slate-900">{clientName || 'your client'}</span> — {formatCurrency(total, currency)} is ready.
+          <button aria-label="Close" onClick={()=> setShowGate(false)} className="absolute inset-0 bg-[#020617]/70 backdrop-blur-sm" />
+          <div className="relative w-full max-w-md rounded-[20px] p-6 md:p-7 bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] backdrop-blur-lg shadow-2xl" style={{ boxShadow:'0 24px 64px rgba(2,6,23,0.6), 0 0 32px rgba(6,182,214,0.16)' }}>
+            <div className="w-10 h-10 rounded-xl bg-[#06b6d4] text-white grid place-items-center mx-auto shadow-[0_4px_16px_rgba(6,182,214,0.32)]">◈</div>
+            <h3 className="font-display font-bold text-lg text-center mt-3 tracking-tight text-[#e2e8f0]">Create a Free Account to Download</h3>
+            <p className="text-sm text-[#e2e8f0]/65 text-center mt-2 leading-relaxed">
+              Your preview for <span className="font-semibold text-[#e2e8f0]">{clientName || 'your client'}</span> — {formatCurrency(total, currency)} is ready.
               <br />Save it, download the PDF, and keep it forever. Free while in beta.
             </p>
 
-            <div className="mt-5 bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs flex items-center justify-between gap-3">
+            <div className="mt-5 bg-white/5 border border-white/10 rounded-xl p-3 text-xs flex items-center justify-between gap-3 text-[#e2e8f0]">
               <span className="truncate"><span className="font-mono font-semibold">{invoiceNumber}</span> · {clientName || 'Client'} · {formatCurrency(total, currency)}</span>
-              <span className="text-[10px] font-bold bg-white border border-gray-200 rounded-full px-2 py-1">Preview</span>
+              <span className="text-[10px] font-bold bg-white/10 border border-white/10 rounded-full px-2 py-1">Preview</span>
             </div>
 
             <div className="mt-5 grid gap-2">
               <Link
                 to="/signup"
                 onClick={()=> { try{ track('invoice_preview_gate_cta', { action: 'signup' }) } catch{} }}
-                className="bg-teal-700 text-white rounded-xl px-5 py-3 text-sm font-semibold text-center hover:bg-teal-800 hover:shadow-md transition"
+                className="bg-[#06b6d4] text-white rounded-xl px-5 py-3 text-sm font-semibold text-center hover:bg-[#0891b2] border border-white/10 shadow-[0_8px_20px_rgba(6,182,214,0.28)]"
               >
                 Create Free Account to Download →
               </Link>
               <Link
                 to="/login"
-                className="bg-white border border-gray-200 rounded-xl px-5 py-2.5 text-sm font-semibold text-center hover:bg-gray-50 transition"
+                className="bg-white/5 border border-white/10 rounded-xl px-5 py-2.5 text-sm font-semibold text-center text-[#e2e8f0] hover:bg-white/10"
               >
                 Already have an account? Log in
               </Link>
-              <button onClick={()=> setShowGate(false)} className="text-xs text-slate-500 hover:text-slate-700 hover:underline mt-1">Continue editing preview</button>
+              <button onClick={()=> setShowGate(false)} className="text-xs text-[#e2e8f0]/50 hover:text-[#e2e8f0] hover:underline mt-1">Continue editing preview</button>
             </div>
 
-            <p className="text-[11px] text-center text-slate-400 mt-4">No credit card · Your preview data stays on this device until you save.</p>
-          </Card>
+            <p className="text-[11px] text-center text-[#e2e8f0]/40 mt-4">No credit card · Your preview data stays on this device until you save.</p>
+          </div>
         </div>
       )}
     </section>

@@ -46,7 +46,7 @@ export default function Layout({ children }){
         {/* Aurora top */}
         <div className="absolute inset-x-0 top-0 h-[280px] pointer-events-none opacity-[0.12]" style={{ background: 'radial-gradient(600px 220px at 40% 0%, rgba(6,182,214,0.32), transparent 70%), radial-gradient(520px 200px at 90% 12%, rgba(16,185,129,0.22), transparent 70%)' }} aria-hidden />
 
-        <div className="relative px-6 pt-7 pb-6 border-b border-white/[0.06]">
+        <div className="relative px-6 pt-7 pb-6 border-b border-slate-200/70 bg-white/95 backdrop-blur-xl">
           <Link to="/dashboard" className="flex items-center gap-3 group">
             <span className="w-9 h-9 rounded-xl grid place-items-center text-[13px] font-bold shrink-0 relative overflow-hidden"
               style={{
@@ -57,7 +57,7 @@ export default function Layout({ children }){
               <span className="relative text-white drop-shadow">◈</span>
               <span className="absolute inset-0 bg-gradient-to-tr from-white/12 to-transparent pointer-events-none" />
             </span>
-            <span className="font-display font-bold text-[17px] tracking-tight text-white group-hover:text-cyan-100 transition">ClearBooks</span>
+            <span className="font-display font-semibold text-[17px] leading-none inline-flex items-center text-[#0f172a] opacity-100 tracking-[0.025em] transition" style={{ color:'#0f172a', opacity:1, fontWeight:700, letterSpacing:'0.025em' }}>ClearBooks</span>
             <span className="ml-1 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
           </Link>
           <p className="text-[11px] text-slate-400 mt-2 tracking-[0.08em] font-medium uppercase">For colorists & post-production</p>
@@ -91,11 +91,11 @@ export default function Layout({ children }){
         </div>
       </aside>
 
-      {/* mobile top bar — glass */}
-      <div className="md:hidden sticky top-0 z-20 border-b border-white/10" style={{ background: 'rgba(2,6,23,0.72)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>
+      {/* mobile top bar — glass (light for deep-slate wordmark contrast) */}
+      <div className="md:hidden sticky top-0 z-20 border-b border-slate-200/70" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>
         <div className="flex items-center justify-between px-4 py-3">
-          <Link to="/dashboard" className="font-display font-bold flex items-center gap-2 tracking-tight text-white"><span className="w-7 h-7 rounded-xl bg-gradient-to-br from-cyan-500 to-cyan-600 text-white grid place-items-center text-xs shadow-[0_4px_12px_rgba(6,182,214,0.35)] border border-white/15">◈</span> ClearBooks</Link>
-          <span className="text-[10px] bg-cyan-400/12 text-cyan-300 border border-cyan-400/22 rounded-full px-2.5 py-1 font-bold tracking-wide uppercase backdrop-blur">Studio</span>
+          <Link to="/dashboard" className="font-display font-bold flex items-center gap-2.5 text-[#0f172a] opacity-100 tracking-[0.025em] leading-none" style={{ color:'#0f172a', opacity:1, fontWeight:700, letterSpacing:'0.025em' }}><span className="w-7 h-7 rounded-xl bg-gradient-to-br from-cyan-500 to-cyan-600 text-white grid place-items-center text-xs shadow-[0_4px_12px_rgba(6,182,214,0.35)] border border-white/15 shrink-0">◈</span><span className="inline-flex items-center">ClearBooks</span></Link>
+          <span className="text-[10px] bg-slate-900 text-white rounded-full px-2.5 py-1 font-bold tracking-wide uppercase">Studio</span>
         </div>
       </div>
 

@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { Card, Button, Input, Select, Label, Empty } from '../components/UI'
 import { formatCurrency, taxLabel } from '../utils/helpers'
-import { getPayments, amountPaid, amountOutstanding, invoiceStatus, statusBadgeClass, outstandingSummary } from '../utils/payments'
-import jsPDF from 'jspdf'
+import { getPayments, amountPaid, amountOutstanding, invoiceStatus, statusBadgeClass, outstandingSummary, pipelineStatus, pipelineBadgeClass, daysOverdue, generateReminder } from '../utils/payments'
+import { generateInvoicePdf } from '../utils/invoicePdf'
 
 export default function InvoicesPage(){
-  const { data, addInvoice, updateInvoice, deleteInvoice, recordPayment, markPaid, markSent, addClient } = useData()
-  const [form,setForm]=useState({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', tax_type: data.settings.default_tax_type || 'none', tax_rate: data.settings.default_tax_rate ?? 0, line_items:[{description:'', quantity:1, rate:0}]})
+  const { data, loading, error: dataError, addInvoice, updateInvoice, deleteInvoice, recordPayment, markPaid, markSent, updateRevisions, addClient } = useData()
+  const [form,setForm]=useState({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Draft', tax_type: data.settings.default_tax_type || 'none', tax_rate: data.settings.default_tax_rate ?? 0, line_items:[{description:'', quantity:1, rate:0}], revisions_included: data.settings.default_revisions_included ?? 2, revisions_used: 0 })
   const [editing,setEditing]=useState(null)
   const [err,setErr]=useState('')
   const [info,setInfo]=useState('')
@@ -40,7 +40,16 @@ export default function InvoicesPage(){
     const q = search.trim().toLowerCase()
     return [...data.invoices]
       .filter(inv=>{
-        if (statusFilter !== 'All' && invoiceStatus(inv) !== statusFilter && !(statusFilter==='Overdue' && invoiceStatus(inv)==='Overdue (partial)')) return false
+        if (statusFilter !== 'All'){
+          const derived = invoiceStatus(inv)
+          const pipe = pipelineStatus(inv)
+          if (['Draft','Sent','Overdue','Paid'].includes(statusFilter)){
+            const isOverdue = pipe==='Overdue' || derived==='Overdue' || derived==='Overdue (partial)'
+            if (statusFilter==='Overdue' ? !isOverdue : pipe !== statusFilter) return false
+          } else {
+            if (derived !== statusFilter && !(statusFilter==='Overdue' && derived==='Overdue (partial)')) return false
+          }
+        }
         if (!q) return true
         return (inv.invoice_number||'').toLowerCase().includes(q) || (inv.client_name||'').toLowerCase().includes(q)
       })
@@ -49,8 +58,31 @@ export default function InvoicesPage(){
 
   // Keep tax defaults in sync with settings for new invoices (not when editing)
   useEffect(()=>{
-    if (!editing) setForm(f=> ({ ...f, tax_type: data.settings.default_tax_type || 'none', tax_rate: data.settings.default_tax_rate ?? 0 }))
-  }, [data.settings.default_tax_rate, data.settings.default_tax_type, editing])
+    if (!editing) setForm(f=> ({ ...f, tax_type: data.settings.default_tax_type || 'none', tax_rate: data.settings.default_tax_rate ?? 0, revisions_included: data.settings.default_revisions_included ?? 2 }))
+  }, [data.settings.default_tax_rate, data.settings.default_tax_type, data.settings.default_revisions_included, editing])
+
+  // Hydrate from landing preview draft (guest → signup flow)
+  useEffect(()=>{
+    if (editing) return
+    try{
+      const raw = localStorage.getItem('clearbooks_preview_draft')
+      if (!raw) return
+      const d = JSON.parse(raw)
+      if (!d || (!d.clientName && !d.amount)) return
+      const isDefaultForm = form.line_items.length===1 && !form.line_items[0].description && Number(form.line_items[0].rate)===0 && !form.client_id
+      if (!isDefaultForm) return
+      const qty = Math.max(1, Number(d.quantity)||1)
+      const rateVal = Number(d.rate) || (Number(d.amount)||0)/qty || 0
+      setForm(f=> ({
+        ...f,
+        line_items: [{ description: d.description || 'Service', quantity: qty, rate: rateVal }],
+      }))
+      if (d.clientName) setNewClientName(d.clientName.slice(0,40))
+      if (d.clientName) setShowNewClient(true)
+      setInfo(`Draft from preview loaded — ${d.clientName || 'your client'} · ${formatCurrency(d.total || d.amount || 0, d.currency || data.settings.currency)} — pick or create the client, then hit Create invoice.`)
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing])
   const subtotal = useMemo(()=> form.line_items.reduce((s,l)=> s + (Number(l.quantity)||0)*(Number(l.rate)||0),0), [form.line_items])
   const tax_rate_num = (form.tax_type === 'none' || form.tax_type === 'exempt') ? 0 : (Number(form.tax_rate) || 0)
   const tax_amount = useMemo(()=> Number((subtotal * tax_rate_num / 100).toFixed(2)), [subtotal, tax_rate_num])
@@ -74,13 +106,25 @@ export default function InvoicesPage(){
     }
     if(total <=0){ setErr('Invoice total must be positive'); return }
     if (tax_rate_num <0 || tax_rate_num >100) { setErr('Tax rate must be 0–100'); return }
+    const revInc = Number(form.revisions_included)
+    const revUsed = Number(form.revisions_used)
+    if (!Number.isInteger(revInc) || revInc <0 || revInc >100){ setErr('Revisions included must be an integer 0–100'); return }
+    if (!Number.isInteger(revUsed) || revUsed <0 || revUsed >100){ setErr('Revisions used must be an integer 0–100'); return }
     const client = data.clients.find(c=>c.id===form.client_id)
+    let dbStatus = form.status
+    let sent_at = undefined
+    if (form.status === 'Draft'){ dbStatus = 'Unpaid'; sent_at = null }
+    else if (form.status === 'Sent'){ dbStatus = 'Unpaid'; sent_at = new Date().toISOString() }
+    else if (form.status === 'Paid'){ dbStatus = 'Paid' }
     const payload = {
       client_id: form.client_id||null,
       client_name: client?.name||'—',
       issue_date: form.issue_date,
       due_date: form.due_date,
-      status: form.status,
+      status: dbStatus,
+      ...(sent_at !== undefined ? { sent_at } : {}),
+      revisions_included: Math.floor(revInc),
+      revisions_used: Math.floor(revUsed),
       tax_type: form.tax_type || 'none',
       tax_rate: tax_rate_num,
       subtotal,
@@ -98,8 +142,9 @@ export default function InvoicesPage(){
         setJustCreatedNum(num || null)
         setExpandedId(null)
         window.scrollTo({top:0, behavior:'smooth'})
+        try{ localStorage.removeItem('clearbooks_preview_draft') } catch {}
       }
-      setForm({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', tax_type: data.settings.default_tax_type || 'none', tax_rate: data.settings.default_tax_rate ?? 0, line_items:[{description:'', quantity:1, rate:0}]}); setEditing(null)
+      setForm({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Draft', tax_type: data.settings.default_tax_type || 'none', tax_rate: data.settings.default_tax_rate ?? 0, line_items:[{description:'', quantity:1, rate:0}], revisions_included: data.settings.default_revisions_included ?? 2, revisions_used: 0 }); setEditing(null)
       setTimeout(()=> setInfo(''), 3000)
     }catch(ex){ setErr(ex.message) }
   }
@@ -113,7 +158,9 @@ export default function InvoicesPage(){
     }catch(ex){ setErr(ex.message) }
   }
   const startEdit=(inv)=>{
-    setEditing(inv.id); setForm({ client_id:inv.client_id||'', issue_date:inv.issue_date, due_date:inv.due_date, status:inv.status === 'Paid' ? 'Paid' : 'Unpaid', tax_type: inv.tax_type || (inv.tax_rate > 0 ? 'custom' : 'none'), tax_rate: inv.tax_rate ?? 0, line_items: inv.line_items?.length? inv.line_items: [{description:'',quantity:1,rate:0}]})
+    const pipe = pipelineStatus(inv)
+    const formStatus = pipe === 'Paid' ? 'Paid' : pipe === 'Sent' ? 'Sent' : pipe === 'Overdue' ? 'Overdue' : pipe === 'Draft' ? 'Draft' : (inv.status === 'Paid' ? 'Paid' : 'Unpaid')
+    setEditing(inv.id); setForm({ client_id:inv.client_id||'', issue_date:inv.issue_date, due_date:inv.due_date, status: formStatus, tax_type: inv.tax_type || (inv.tax_rate > 0 ? 'custom' : 'none'), tax_rate: inv.tax_rate ?? 0, line_items: inv.line_items?.length? inv.line_items: [{description:'',quantity:1,rate:0}], revisions_included: inv.revisions_included ?? 2, revisions_used: inv.revisions_used ?? 0 })
     setErr(''); window.scrollTo({top:0,behavior:'smooth'})
   }
 
@@ -164,62 +211,27 @@ export default function InvoicesPage(){
   }
 
   const handleReminder = async (inv)=>{
+    const days = daysOverdue(inv)
     const bal = amountOutstanding(inv)
-    const text = `Hi ${inv.client_name}, friendly reminder: invoice ${inv.invoice_number} for ${formatCurrency(bal, data.settings.currency)} was due ${inv.due_date}. Please let me know when paid. Thanks!`
+    const business = data.settings.business_name || data.settings.name || 'ClearBooks'
+    const { whatsapp } = generateReminder(inv, { businessName: business, currency: data.settings.currency, bal, daysLate: days })
     try{
-      await navigator.clipboard.writeText(text)
-      setInfo('Reminder text copied — paste it to your client')
-      setTimeout(()=> setInfo(''), 2500)
-    }catch{ alert(text) }
+      await navigator.clipboard.writeText(whatsapp)
+      setInfo(`Reminder copied — ${days>0? `${days} days late • `:''}paste into WhatsApp or Email`)
+      setTimeout(()=> setInfo(''), 2800)
+    }catch{ alert(whatsapp) }
+  }
+
+  const handleRevisionUsed = async (inv, delta)=>{
+    const cur = Number(inv.revisions_used ?? 0)
+    const next = cur + delta
+    if (next <0 || next>100) return
+    try{ await updateRevisions(inv.id, { revisions_used: next }) }catch(e){ alert(e.message) }
   }
 
   const downloadPDF=(inv)=>{
-    const doc = new jsPDF()
-    const business = data.settings.business_name || data.settings.name || 'ClearBooks'
-    const currency = data.settings.currency || '$'
-    const st = invoiceStatus(inv)
-    const paid = amountPaid(inv)
-    const bal = amountOutstanding(inv)
-    doc.setFontSize(18); doc.setFont('helvetica','bold'); doc.text(business, 14, 20)
-    doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.text('Invoice', 14, 28)
-    doc.setFontSize(22); doc.setFont('helvetica','bold'); doc.text(inv.invoice_number, 150, 20)
-    doc.setFontSize(9); doc.setFont('helvetica','normal')
-    doc.text(`Issue: ${inv.issue_date}`, 150, 28)
-    doc.text(`Due: ${inv.due_date}`, 150, 33)
-    doc.text(`Status: ${st}`, 150, 38)
-    if (inv.payment_date) doc.text(`Paid: ${inv.payment_date}`, 150, 43)
-    doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.text('Bill to:', 14, 42)
-    doc.setFont('helvetica','normal'); doc.text(inv.client_name||'—', 14, 48)
-    const clientObj = data.clients.find(c=>c.id===inv.client_id)
-    if(clientObj?.email) doc.text(clientObj.email, 14, 53)
-    let y=64
-    doc.setFont('helvetica','bold'); doc.setFontSize(9)
-    doc.text('Description', 14, y); doc.text('Qty', 110, y); doc.text('Rate', 130, y); doc.text('Total', 170, y)
-    doc.line(14,y+2,196,y+2)
-    y+=8
-    doc.setFont('helvetica','normal')
-    inv.line_items?.forEach(l=>{
-      if(y>270){ doc.addPage(); y=20}
-      doc.text(String(l.description||'').slice(0,45), 14, y)
-      doc.text(String(l.quantity), 110, y)
-      doc.text(currency+Number(l.rate).toFixed(2), 130, y)
-      doc.text(currency+Number(l.total ?? (l.quantity*l.rate)).toFixed(2), 170, y)
-      y+=6
-    })
-    y+=4; doc.line(14,y,196,y)
-    y+=8; doc.setFont('helvetica','normal'); doc.setFontSize(10)
-    const rate = Number(inv.tax_rate ?? 0)
-    const ttype = inv.tax_type || (rate > 0 ? 'custom' : 'none')
-    const grand = Number(inv.total_amount)
-    const sub = Number(inv.subtotal ?? (rate ? grand / (1 + rate/100) : grand))
-    const tax = Number(inv.tax_amount ?? (sub * rate / 100))
-    doc.text(`Subtotal: ${currency}${sub.toFixed(2)}`, 150, y)
-    y+=6; doc.text(`${taxLabel(ttype, rate)}: ${currency}${tax.toFixed(2)}`, 150, y)
-    y+=6; doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.text(`Total: ${currency}${grand.toFixed(2)}`, 150, y)
-    if (paid > 0) { y+=6; doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.text(`Paid: ${currency}${paid.toFixed(2)}`, 150, y) }
-    if (bal > 0 && paid > 0) { y+=6; doc.text(`Still owed: ${currency}${bal.toFixed(2)}`, 150, y) }
-    y+=10; doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120); doc.text('Thank you for your business!', 14, y)
-    doc.text('Generated by ClearBooks', 14, y+5)
+    const client = data.clients.find(c=>c.id===inv.client_id) || null
+    const doc = generateInvoicePdf({ invoice: inv, settings: data.settings, client })
     doc.save(`${inv.invoice_number}.pdf`)
   }
 
@@ -275,12 +287,22 @@ export default function InvoicesPage(){
             <div><Label htmlFor="invoice-due">Due date *</Label><Input id="invoice-due" type="date" value={form.due_date} onChange={e=>setForm({...form, due_date:e.target.value})} required /></div>
           </div>
           <div className="grid md:grid-cols-3 gap-4 max-w-2xl">
-            <div><Label htmlFor="invoice-status">Status</Label><Select id="invoice-status" value={form.status} onChange={e=>setForm({...form, status:e.target.value})}><option>Unpaid</option><option>Paid</option><option>Overdue</option></Select></div>
+            <div><Label htmlFor="invoice-status">Status — pipeline</Label><Select id="invoice-status" value={form.status} onChange={e=>setForm({...form, status:e.target.value})}><option value="Draft">Draft — not sent</option><option value="Sent">Sent — awaiting payment</option><option value="Unpaid">Unpaid (legacy)</option><option value="Paid">Paid</option><option value="Overdue">Overdue (auto)</option></Select></div>
             <div><Label htmlFor="invoice-tax-type">Tax</Label><Select id="invoice-tax-type" value={form.tax_type} onChange={e=>setForm({...form, tax_type: e.target.value})}><option value="none">No tax</option><option value="gst">GST</option><option value="vat">VAT</option><option value="custom">Custom</option><option value="exempt">Tax exempt</option></Select></div>
             <div><Label htmlFor="invoice-tax">Rate (%) *</Label><Input id="invoice-tax" type="number" min="0" max="100" step="0.01" value={form.tax_type==='none'||form.tax_type==='exempt' ? 0 : form.tax_rate} onChange={e=>setForm({...form, tax_rate: e.target.value})} required disabled={form.tax_type==='none'||form.tax_type==='exempt'} />
             </div>
           </div>
           <p className="text-[11px] text-gray-400 -mt-2">Tax type and rate are snapshotted per invoice — changing defaults later won’t affect this invoice. Rules vary by country; pick what applies.</p>
+
+          {/* Revision Guard — contract milestone */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <div className="text-sm font-semibold">Revision Guard — Project Milestone</div>
+            <div className="grid md:grid-cols-2 gap-4 mt-2">
+              <div><Label htmlFor="revisions_included">Revisions Included *</Label><Input id="revisions_included" type="number" min="0" max="100" step="1" value={form.revisions_included} onChange={e=> setForm({...form, revisions_included: e.target.value === '' ? '' : Number(e.target.value)})} required /></div>
+              <div><Label htmlFor="revisions_used">Revisions Used</Label><Input id="revisions_used" type="number" min="0" max="100" step="1" value={form.revisions_used} onChange={e=> setForm({...form, revisions_used: e.target.value === '' ? '' : Number(e.target.value)})} required /></div>
+            </div>
+            <div className="mt-2 text-[11px] text-slate-500">PDF shows: Revisions Included: {form.revisions_included ?? 2} | Used: {form.revisions_used ?? 0}</div>
+          </div>
 
           <div>
             <div className="flex items-center justify-between mb-2"><Label>Line items *</Label><Button type="button" variant="ghost" onClick={addLine} className="text-xs py-1.5">＋ Add line</Button></div>
@@ -308,7 +330,7 @@ export default function InvoicesPage(){
 
           <div className="flex gap-2">
             <Button type="submit">{editing?'Update invoice':'Create invoice'}</Button>
-            {editing && <Button type="button" variant="ghost" onClick={()=>{setEditing(null); setForm({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Unpaid', tax_type: data.settings.default_tax_type || 'none', tax_rate: data.settings.default_tax_rate ?? 0, line_items:[{description:'', quantity:1, rate:0}]}); setErr('')}}>Cancel</Button>}
+            {editing && <Button type="button" variant="ghost" onClick={()=>{setEditing(null); setForm({ client_id:'', issue_date:new Date().toISOString().slice(0,10), due_date:new Date(Date.now()+14*24*3600*1000).toISOString().slice(0,10), status:'Draft', tax_type: data.settings.default_tax_type || 'none', tax_rate: data.settings.default_tax_rate ?? 0, line_items:[{description:'', quantity:1, rate:0}], revisions_included: data.settings.default_revisions_included ?? 2, revisions_used: 0 }); setErr('')}}>Cancel</Button>}
           </div>
         </form>
       </Card>
@@ -329,20 +351,22 @@ export default function InvoicesPage(){
               <tbody className="divide-y divide-gray-100">
                 {visibleInvoices.map(inv=>{
                   const s = invoiceStatus(inv)
+                  const pipe = pipelineStatus(inv)
                   const paid = amountPaid(inv)
                   const bal = amountOutstanding(inv)
                   const pays = getPayments(inv)
                   const rate = Number(inv.tax_rate ?? 0)
                   const ttype = inv.tax_type || (rate > 0 ? 'custom' : 'none')
+                  const days = daysOverdue(inv)
                   const isOpen = expandedId === inv.id
                   return (
                     <>
                     <tr key={inv.id} className="hover:bg-gray-50/50 align-top">
-                      <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap">{inv.invoice_number}{inv.sent_at && <div className="text-[10px] text-gray-400 font-normal">Sent</div>}</td>
+                      <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap">{inv.invoice_number}{pipe==='Sent' && <div className="text-[10px] text-indigo-600 font-normal">Sent</div>}{pipe==='Draft' && <div className="text-[10px] text-slate-400 font-normal">Draft</div>}</td>
                       <td className="px-4 py-3">{inv.client_name}</td>
-                      <td className="px-4 py-3 text-xs leading-tight whitespace-nowrap">{inv.issue_date} → {inv.due_date}{inv.payment_date && <div className="text-emerald-600">Paid {inv.payment_date}</div>}<div className="text-gray-400">{taxLabel(ttype, rate)}</div></td>
+                      <td className="px-4 py-3 text-xs leading-tight whitespace-nowrap">{inv.issue_date} → {inv.due_date}{inv.payment_date && <div className="text-emerald-600">Paid {inv.payment_date}</div>}<div className="text-gray-400">{taxLabel(ttype, rate)}</div><div className={`text-[10px] font-medium ${ (inv.revisions_used??0) > (inv.revisions_included??2) ? 'text-red-600' : 'text-slate-500'}`}>⟲ {inv.revisions_used ?? 0}/{inv.revisions_included ?? 2} revisions{(inv.revisions_used??0) > (inv.revisions_included??2) ? ' · billable' : ''}</div>{pipe==='Overdue' && <div className="text-[10px] font-bold text-red-600">{days} days late</div>}</td>
                       <td className="px-4 py-3 text-right whitespace-nowrap"><span className="font-semibold">{formatCurrency(inv.total_amount, data.settings.currency)}</span>{paid>0 && <div className="text-[11px] text-gray-500">Paid {formatCurrency(paid, data.settings.currency)}{bal>0 && ` · Owes ${formatCurrency(bal, data.settings.currency)}`}</div>}</td>
-                      <td className="px-4 py-3 text-center whitespace-nowrap">{badge(s)}</td>
+                      <td className="px-4 py-3 text-center whitespace-nowrap"><div className="flex flex-col items-center gap-1">{badge(s)}{pipe!==s && <span className={`text-[10px] font-bold border rounded-full px-2 py-0.5 ${pipelineBadgeClass(pipe)}`}>{pipe}</span>}{pipe==='Overdue' && <span className={`text-[10px] font-bold border rounded-full px-2 py-0.5 ${days>=14?'bg-red-600 text-white border-red-600': days>=7?'bg-amber-500 text-white border-amber-500':'bg-amber-50 text-amber-700 border-amber-200'}`}>{days} late</span>}</div></td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1 justify-end flex-wrap max-w-[280px]">
                           <button onClick={()=>downloadPDF(inv)} className="text-xs bg-teal-700 text-white rounded-full px-3 py-1">PDF</button>
@@ -350,7 +374,7 @@ export default function InvoicesPage(){
                           <button onClick={()=>handleCopy(inv)} className="text-xs bg-white border border-gray-200 rounded-full px-3 py-1 hover:bg-gray-50">Copy</button>
                           {bal > 0 && <button onClick={()=>handleMarkPaid(inv)} className="text-xs bg-emerald-600 text-white rounded-full px-3 py-1 hover:bg-emerald-700">Mark as Paid</button>}
                           {bal > 0 && <button onClick={()=>{ setPayFor(payFor===inv.id?null:inv.id); setPayForm({ amount: bal.toFixed(2), date:new Date().toISOString().slice(0,10), note:'' }) }} className="text-xs bg-white border border-gray-200 rounded-full px-3 py-1 hover:bg-gray-50">+ Payment</button>}
-                          {bal > 0 && <button onClick={()=>handleReminder(inv)} className="text-xs bg-white border border-gray-200 rounded-full px-3 py-1 hover:bg-gray-50">Remind</button>}
+                          {bal > 0 && <button onClick={()=>handleReminder(inv)} className="text-xs bg-white border border-gray-200 rounded-full px-3 py-1 hover:bg-gray-50">Nudge</button>}
                           <button onClick={()=>setExpandedId(isOpen?null:inv.id)} className="text-xs border border-gray-200 rounded-full px-3 py-1">{isOpen?'Hide':'Details'}</button>
                           <button onClick={()=>startEdit(inv)} className="text-xs border border-gray-200 rounded-full px-3 py-1">Edit</button>
                           <button onClick={async()=>{ if(confirm('Delete invoice?')){ try{ await deleteInvoice(inv.id)}catch(e){ alert(e.message)}}}} className="text-xs bg-red-50 text-red-700 border border-red-200 rounded-full px-3 py-1">Delete</button>
@@ -386,6 +410,18 @@ export default function InvoicesPage(){
                                 <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatCurrency(inv.subtotal ?? inv.total_amount, data.settings.currency)}</span></div>
                                 <div className="flex justify-between text-gray-600"><span>{taxLabel(ttype, rate)}</span><span>{formatCurrency(inv.tax_amount ?? 0, data.settings.currency)}</span></div>
                                 <div className="flex justify-between font-bold"><span>Total</span><span>{formatCurrency(inv.total_amount, data.settings.currency)}</span></div>
+                              </div>
+                              {/* Revision Guard — Project Milestone */}
+                              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                                <div className="text-[11px] font-bold tracking-widest uppercase text-amber-700 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Project Milestone — Revision Guard</div>
+                                <div className="mt-2 flex items-center justify-between gap-2">
+                                  <span className="text-sm font-mono font-semibold bg-white border border-amber-200 rounded-full px-2.5 py-1">Revisions Included: {inv.revisions_included ?? 2} | Used: {inv.revisions_used ?? 0}</span>
+                                  <div className="flex gap-1">
+                                    <button onClick={()=>handleRevisionUsed(inv,-1)} disabled={(inv.revisions_used??0)<=0} className="text-xs w-7 h-7 rounded-full border bg-white hover:bg-amber-50 disabled:opacity-40">−</button>
+                                    <button onClick={()=>handleRevisionUsed(inv, 1)} disabled={(inv.revisions_used??0)>=100} className="text-xs w-7 h-7 rounded-full bg-amber-500 text-white hover:bg-amber-600">＋</button>
+                                  </div>
+                                </div>
+                                <p className="text-[11px] text-slate-500 mt-1.5">{(inv.revisions_used??0) > (inv.revisions_included??2) ? <span className="text-red-600 font-medium">Over by {(inv.revisions_used??0)-(inv.revisions_included??2)} — extra revisions billable</span> : `${Math.max(0,(inv.revisions_included??2)-(inv.revisions_used??0))} free revisions remaining` } · appears on PDF as contract term</p>
                               </div>
                             </div>
                             <div>
@@ -465,6 +501,14 @@ function CompletedInvoiceCard({ inv, currency, business, client, onClose, onDown
           {paid > 0 && <div className="flex justify-between text-emerald-700"><span>Paid</span><span>{formatCurrency(paid, currency)}</span></div>}
           {bal > 0 && paid > 0 && <div className="flex justify-between text-amber-700 font-medium"><span>Still owed</span><span>{formatCurrency(bal, currency)}</span></div>}
         </div>
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/60 p-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-[11px] font-bold tracking-widest uppercase text-amber-700">Project Milestone</div>
+            <div className="text-xs text-slate-600 mt-0.5">Revision Guard — contract term</div>
+          </div>
+          <span className="font-mono text-xs font-bold bg-white border border-amber-200 rounded-full px-3 py-1.5 whitespace-nowrap">Revisions Included: {inv.revisions_included ?? 2} | Used: {inv.revisions_used ?? 0}</span>
+        </div>
+        { (inv.revisions_used ?? 0) > (inv.revisions_included ?? 2) && <p className="text-[11px] text-red-600 mt-1 text-right">Over by {(inv.revisions_used ?? 0)-(inv.revisions_included ?? 2)} — billable</p>}
         <div className="flex flex-wrap gap-2 mt-5">
           <button onClick={onDownload} className="bg-teal-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-teal-800">Download PDF</button>
           <button onClick={onSend} className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-gray-50">Send</button>

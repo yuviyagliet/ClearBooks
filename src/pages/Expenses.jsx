@@ -113,7 +113,7 @@ export default function ExpensesPage(){
         </form>
       </Card>
 
-      {data.expenses.length===0 ? <Empty title="No expenses yet" desc="Add your first expense — with a receipt if you want." /> :
+      {data.expenses.length===0 ? <Empty variant="expense" title="Every great production tracks its spend" desc="Add your first expense to see the magic — receipts, categories and burn rate, all beautifully organized." action={<Button onClick={()=> document.getElementById('expense-amount')?.focus()}>Add your first expense →</Button>} /> :
         <Card className="overflow-hidden">
           {data.expenses.length > 3 && (
             <div className="p-4 border-b border-gray-100 bg-gray-50/50">

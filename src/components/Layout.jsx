@@ -36,40 +36,43 @@ export default function Layout({ children }){
   const primaryNav = nav.slice(0,4) // Dashboard, Income, Expenses, Invoices
   const secondaryNav = nav.slice(4) // Clients, Reports, Settings
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#f9fafb]">
-      {/* sidebar - desktop */}
-      <aside className="hidden md:flex w-60 bg-white border-r border-gray-200 flex-col sticky top-0 h-screen">
-        <div className="px-6 py-5 border-b border-gray-100">
-          <Link to="/dashboard" className="flex items-center gap-2 font-bold text-lg tracking-tight">
-            <span className="w-8 h-8 rounded-lg bg-teal-700 text-white grid place-items-center text-sm">◈</span>
+    <div className="min-h-screen flex flex-col md:flex-row bg-[#f8faf9] selection:bg-teal-100">
+      {/* sidebar - desktop — premium */}
+      <aside className="hidden md:flex w-[264px] bg-white/90 backdrop-blur-xl border-r border-gray-200/70 flex-col sticky top-0 h-screen shadow-[1px_0_24px_rgba(0,0,0,0.04)]">
+        <div className="px-6 py-6 border-b border-gray-100">
+          <Link to="/dashboard" className="flex items-center gap-2.5 font-display font-bold text-[17px] tracking-tight hover:opacity-90 transition">
+            <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-700 to-teal-600 text-white grid place-items-center text-[13px] shadow-[0_4px_12px_rgba(15,118,110,0.25)] ring-1 ring-teal-700/10">◈</span>
             ClearBooks
           </Link>
-          <p className="text-xs text-gray-500 mt-1">For colorists & post-production</p>
+          <p className="text-[11px] text-slate-500 mt-1.5 tracking-wide font-medium">For colorists & post-production</p>
+          <div className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-widest uppercase text-teal-700 bg-teal-50 border border-teal-100 rounded-full px-2.5 py-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-teal-600 animate-pulse" /> Studio grade
+          </div>
         </div>
-        <nav className="flex-1 p-3 space-y-1 overflow-auto">
+        <nav className="flex-1 p-3 space-y-1.5 overflow-auto">
           {nav.map(n=>(
-            <NavLink key={n.to} to={n.to} className={({isActive})=> `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition ${isActive?'bg-teal-700 text-white':'text-gray-600 hover:bg-gray-100'}`}>
-              <NavIcon name={n.icon} className="w-5 h-5 shrink-0" />{n.label}
+            <NavLink key={n.to} to={n.to} className={({isActive})=> `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${isActive?'bg-teal-700 text-white shadow-[0_4px_12px_rgba(15,118,110,0.22)] translate-x-[1px]':'text-slate-600 hover:bg-slate-50 hover:text-slate-900 hover:translate-x-[1px] hover:shadow-sm'}`}>
+              <NavIcon name={n.icon} className="w-[18px] h-[18px] shrink-0" />{n.label}
             </NavLink>
           ))}
         </nav>
-        <div className="p-4 border-t border-gray-100">
-          <div className="text-xs text-gray-500 truncate" title={user?.email}>{user?.email || '—'}</div>
-          <button onClick={handleOut} className="mt-2 w-full text-sm bg-gray-900 text-white rounded-xl py-2 hover:bg-black">Logout</button>
-          <Link to="/settings" className="mt-2 block text-center w-full text-xs border border-gray-200 rounded-xl py-2 hover:bg-gray-50">Settings</Link>
+        <div className="p-4 border-t border-gray-100 bg-gradient-to-b from-transparent to-slate-50/60">
+          <div className="text-[11px] font-medium text-slate-600 truncate flex items-center gap-1.5" title={user?.email}><span className="w-6 h-6 rounded-full bg-slate-900 text-white grid place-items-center text-[10px] shrink-0">{(user?.email||'?')[0].toUpperCase()}</span><span className="truncate">{user?.email || '—'}</span></div>
+          <button onClick={handleOut} className="mt-3 w-full text-sm bg-slate-900 text-white rounded-xl py-2.5 font-semibold hover:bg-black hover:shadow-md active:scale-[0.98] transition">Logout</button>
+          <Link to="/settings" className="mt-2 block text-center w-full text-xs font-medium border border-gray-200 rounded-xl py-2.5 hover:bg-white hover:border-gray-300 hover:shadow-sm transition">Settings</Link>
         </div>
       </aside>
 
       {/* mobile top bar */}
-      <div className="md:hidden bg-white border-b border-gray-200 sticky top-0 z-20">
+      <div className="md:hidden bg-white/80 backdrop-blur-xl border-b border-gray-200 sticky top-0 z-20">
         <div className="flex items-center justify-between px-4 py-3">
-          <Link to="/dashboard" className="font-bold flex items-center gap-2"><span className="w-7 h-7 rounded-lg bg-teal-700 text-white grid place-items-center text-xs">◈</span> ClearBooks</Link>
-          <span className="text-[10px] bg-teal-50 text-teal-700 border border-teal-100 rounded-full px-2 py-1">Post-production</span>
+          <Link to="/dashboard" className="font-display font-bold flex items-center gap-2 tracking-tight"><span className="w-7 h-7 rounded-xl bg-gradient-to-br from-teal-700 to-teal-600 text-white grid place-items-center text-xs shadow">◈</span> ClearBooks</Link>
+          <span className="text-[10px] bg-teal-50 text-teal-700 border border-teal-100 rounded-full px-2.5 py-1 font-semibold tracking-wide uppercase">Post-production</span>
         </div>
       </div>
 
       <main className="flex-1 min-w-0 pb-20 md:pb-0">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-8">
+        <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-8" style={{ animation: 'fadeUp 0.45s ease' }}>
           {children}
         </div>
       </main>

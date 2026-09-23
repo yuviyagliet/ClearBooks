@@ -15,9 +15,23 @@ const defaultData = {
     { id: 'e2', date: new Date(Date.now()-10*24*3600*1000).toISOString().slice(0,10), category: 'Marketing', amount: 120, description: 'Ads', receipt_url: '' },
   ],
   invoices: [
-    { id: 'inv1', invoice_number: 'INV-1001', client_id: 'c1', client_name: 'Acme Co', issue_date: new Date().toISOString().slice(0,10), due_date: new Date(Date.now()+7*24*3600*1000).toISOString().slice(0,10), status: 'Unpaid', line_items: [{description:'Design', quantity:1, rate:2500, total:2500}], total_amount: 2500, tax_rate: 0, subtotal: 2500, tax_amount: 0 },
+    { id: 'inv1', invoice_number: 'INV-1001', client_id: 'c1', client_name: 'Acme Co', issue_date: new Date().toISOString().slice(0,10), due_date: new Date(Date.now()+7*24*3600*1000).toISOString().slice(0,10), status: 'Unpaid', line_items: [{description:'Design', quantity:1, rate:2500, total:2500}], total_amount: 2500, tax_rate: 0, subtotal: 2500, tax_amount: 0, revisions_included: 2, revisions_used: 0 },
   ],
-  settings: { name: 'Alex Freelancer', business_name: 'Alex Studio', currency: '$', default_tax_rate: 0, default_tax_type: 'none' },
+  settings: {
+    name: 'Alex Freelancer',
+    business_name: 'Alex Studio',
+    currency: '$',
+    default_tax_rate: 0,
+    default_tax_type: 'none',
+    // Premium PDF branding & theme
+    invoiceTheme: 'modern-minimal',
+    primaryColor: '#0f766e',
+    logoUrl: null,
+    logoName: null,
+    paymentInstructions: { bankName: '', accountNumber: '', ifsc: '', accountHolder: '', paypalLink: '', upiId: '', custom: '' },
+    termsEnabled: false,
+    termsText: 'Payment due within 14 days. Late payments may incur fees. Thank you for your business!',
+  },
   invoice_counter: 1002,
 }
 
@@ -41,6 +55,19 @@ export function loadLocal() {
       parsed.settings.default_tax_type = 'none'
       migrated = true
     }
+    if (!parsed.settings.invoiceTheme) { parsed.settings.invoiceTheme = 'modern-minimal'; migrated = true }
+    if (!parsed.settings.primaryColor) { parsed.settings.primaryColor = '#0f766e'; migrated = true }
+    if (parsed.settings.logoUrl === undefined) { parsed.settings.logoUrl = null; migrated = true }
+    if (parsed.settings.logoName === undefined) { parsed.settings.logoName = null; migrated = true }
+    if (!parsed.settings.paymentInstructions || typeof parsed.settings.paymentInstructions !== 'object') {
+      parsed.settings.paymentInstructions = { bankName: '', accountNumber: '', ifsc: '', accountHolder: '', paypalLink: '', upiId: '', custom: '' }
+      migrated = true
+    } else {
+      const pi = parsed.settings.paymentInstructions
+      for (const k of ['bankName','accountNumber','ifsc','accountHolder','paypalLink','upiId','custom']) if (pi[k]===undefined) { pi[k]=''; migrated=true }
+    }
+    if (parsed.settings.termsEnabled === undefined) { parsed.settings.termsEnabled = false; migrated = true }
+    if (parsed.settings.termsText === undefined) { parsed.settings.termsText = 'Payment due within 14 days. Late payments may incur fees. Thank you for your business!'; migrated = true }
     if (Array.isArray(parsed.invoices)) {
       parsed.invoices.forEach(inv => {
         if (inv.tax_rate == null) {
@@ -57,6 +84,9 @@ export function loadLocal() {
         if (inv.subtotal == null) inv.subtotal = inv.total_amount || 0
         if (inv.tax_amount == null) inv.tax_amount = Number((inv.subtotal * (inv.tax_rate||0) / 100).toFixed(2))
         if (inv.total_amount == null) inv.total_amount = inv.subtotal + inv.tax_amount
+        // Revision Guard
+        if (inv.revisions_included == null) { inv.revisions_included = 2; migrated = true }
+        if (inv.revisions_used == null) { inv.revisions_used = 0; migrated = true }
         // migrate legacy "Paid" invoices into payment records
         if (!Array.isArray(inv.payments)) {
           inv.payments = inv.status === 'Paid'

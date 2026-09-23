@@ -81,7 +81,7 @@ export default function ClientsPage(){
         </form>
       </Card>
 
-      {data.clients.length===0 ? <Empty title="No clients yet" desc="Add your first client to use when creating invoices." /> :
+      {data.clients.length===0 ? <Empty variant="client" title="Your roster, beautifully organized" desc="Add your first client to see the magic — billing details, outstanding totals and invoice history, all in one premium view." action={<Button onClick={()=> document.getElementById('client-name')?.focus()}>Add your first client →</Button>} /> :
         <>
         {data.clients.length > 1 && (
           <div className="flex gap-2 items-center">

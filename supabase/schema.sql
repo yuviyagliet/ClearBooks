@@ -90,6 +90,9 @@ alter table public.invoices add column if not exists tax_type text not null defa
 alter table public.invoices add column if not exists tax_rate numeric not null default 0 check (tax_rate >= 0 and tax_rate <= 100);
 alter table public.invoices add column if not exists subtotal numeric check (subtotal >= 0);
 alter table public.invoices add column if not exists tax_amount numeric check (tax_amount >= 0);
+-- Revision Guard: stop revision creep — contract-style milestone term
+alter table public.invoices add column if not exists revisions_included integer not null default 2 check (revisions_included >= 0 and revisions_included <= 100);
+alter table public.invoices add column if not exists revisions_used integer not null default 0 check (revisions_used >= 0 and revisions_used <= 100);
 -- Backfill: existing invoices without a meaningful rate get 0 and should be reviewed; set to current default (e.g. 18) if you prefer:
 -- update public.invoices set tax_rate = 18 where tax_rate is null or tax_rate = 0;
 -- update public.invoices set subtotal = total_amount / (1 + tax_rate/100.0), tax_amount = total_amount - subtotal where subtotal is null;

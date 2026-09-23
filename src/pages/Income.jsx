@@ -127,7 +127,7 @@ export default function IncomePage(){
         )
       })()}
 
-      {data.income.length===0 ? <Empty title="No income yet" desc="Add your first payment to see it here." /> :
+      {data.income.length===0 ? <Empty variant="income" title="Your financial journey starts here" desc="Add your first income to see the magic — your ledger, insights and cash-flow will bloom right here." action={<Button onClick={()=> document.getElementById('income-amount')?.focus()}>Add your first income →</Button>} /> :
         <Card className="overflow-hidden">
           {data.income.length > 3 && (
             <div className="p-4 border-b border-gray-100 bg-gray-50/50">

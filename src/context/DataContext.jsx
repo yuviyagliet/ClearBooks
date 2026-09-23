@@ -3,12 +3,14 @@ import { supabase, useLocalMode } from '../lib/supabase'
 import { loadLocal, saveLocal } from '../utils/storage'
 import { useAuth } from './AuthContext'
 import { track } from '../lib/analytics'
+import { toFriendlyError } from '../utils/errors'
 
 const DataContext = createContext(null)
 
 export function DataProvider({ children }) {
   const { user } = useAuth()
-  const [data, setData] = useState(() => useLocalMode ? loadLocal() : { clients:[], income:[], expenses:[], invoices:[], settings:{name:'', business_name:'', currency:'$', default_tax_rate:0, default_tax_type:'none'}, invoice_counter:1001 })
+  const defaultSettings = { name:'', business_name:'', currency:'$', default_tax_rate:0, default_tax_type:'none', invoiceTheme:'modern-minimal', primaryColor:'#0f766e', logoUrl:null, logoName:null, paymentInstructions:{ bankName:'', accountNumber:'', ifsc:'', accountHolder:'', paypalLink:'', upiId:'', custom:'' }, termsEnabled:false, termsText:'Payment due within 14 days. Late payments may incur fees. Thank you for your business!', default_revisions_included:2 }
+  const [data, setData] = useState(() => useLocalMode ? loadLocal() : { clients:[], income:[], expenses:[], invoices:[], settings: defaultSettings, invoice_counter:1001 })
   const [loading, setLoading] = useState(!useLocalMode)
   const [error, setError] = useState(null)
 
@@ -24,7 +26,7 @@ export function DataProvider({ children }) {
       return
     }
     if (!user) { 
-      setData({ clients:[], income:[], expenses:[], invoices:[], settings:{name:'', business_name:'', currency:'$', default_tax_rate:0, default_tax_type:'none'}, invoice_counter:1001 })
+      setData({ clients:[], income:[], expenses:[], invoices:[], settings: defaultSettings, invoice_counter:1001 })
       setLoading(false); return 
     }
     setLoading(true)
@@ -42,10 +44,18 @@ export function DataProvider({ children }) {
       if (expenses.error) throw expenses.error
       if (invoices.error) throw invoices.error
 
-      const savedSettings = JSON.parse(localStorage.getItem('clearbooks_settings') || 'null') || { name: user.email?.split('@')[0]||'', business_name:'', currency:'$', default_tax_rate:0, default_tax_type:'none' }
+      const savedSettings = JSON.parse(localStorage.getItem('clearbooks_settings') || 'null') || { name: user.email?.split('@')[0]||'', business_name:'', currency:'$', default_tax_rate:0, default_tax_type:'none', invoiceTheme:'modern-minimal', primaryColor:'#0f766e', logoUrl:null, logoName:null, paymentInstructions:{ bankName:'', accountNumber:'', ifsc:'', accountHolder:'', paypalLink:'', upiId:'', custom:'' }, termsEnabled:false, termsText:'Payment due within 14 days. Late payments may incur fees. Thank you for your business!' }
       // Existing users keep their stored rate; only brand-new users default to No tax (0%)
       if (savedSettings.default_tax_rate == null) savedSettings.default_tax_rate = 0
       if (savedSettings.default_tax_type == null) savedSettings.default_tax_type = 'none'
+      if (!savedSettings.invoiceTheme) savedSettings.invoiceTheme = 'modern-minimal'
+      if (!savedSettings.primaryColor) savedSettings.primaryColor = '#0f766e'
+      if (savedSettings.logoUrl === undefined) savedSettings.logoUrl = null
+      if (savedSettings.logoName === undefined) savedSettings.logoName = null
+      if (!savedSettings.paymentInstructions || typeof savedSettings.paymentInstructions !== 'object') savedSettings.paymentInstructions = { bankName:'', accountNumber:'', ifsc:'', accountHolder:'', paypalLink:'', upiId:'', custom:'' }
+      if (savedSettings.termsEnabled === undefined) savedSettings.termsEnabled = false
+      if (savedSettings.termsText === undefined) savedSettings.termsText = 'Payment due within 14 days. Late payments may incur fees. Thank you for your business!'
+      if (savedSettings.default_revisions_included == null) savedSettings.default_revisions_included = 2
       const invCounter = invoices.data?.length ? Math.max(...invoices.data.map(i=> parseInt(String(i.invoice_number).replace(/\D/g,''))||1000))+1 : 1001
 
       // Backfill tax_rate/tax_type for old invoices missing them (0% keeps old totals intact)
@@ -65,6 +75,18 @@ export function DataProvider({ children }) {
         invoicesData = invoicesData.map(inv => (inv.tax_rate == null || inv.tax_type == null) ? { ...inv, tax_rate: inv.tax_rate ?? 0, tax_type: inv.tax_type ?? (inv.tax_rate > 0 ? 'custom' : 'none'), _taxMigrated: true } : inv)
       }
 
+      // Revision Guard backfill — ensure contract terms exist (2 included, 0 used)
+      const needsRev = invoicesData.some(inv => inv.revisions_included == null || inv.revisions_used == null)
+      if (needsRev){
+        const toBackfillRev = invoicesData.filter(inv => inv.revisions_included == null).map(inv=> inv.id)
+        if (toBackfillRev.length){
+          supabase.from('invoices').update({ revisions_included: 2, revisions_used: 0 }).in('id', toBackfillRev).then(({error})=>{
+            if (error) console.warn('Backfill revisions failed (run schema migration)', error.message)
+          })
+        }
+        invoicesData = invoicesData.map(inv=> ({ ...inv, revisions_included: inv.revisions_included ?? 2, revisions_used: inv.revisions_used ?? 0 }))
+      }
+
       // Normalize payments array so UI never breaks on older rows/DBs
       invoicesData = invoicesData.map(inv => ({
         ...inv,
@@ -80,8 +102,9 @@ export function DataProvider({ children }) {
         invoice_counter: invCounter,
       })
     } catch (e) {
+      const friendly = toFriendlyError(e, 'refresh')
       console.error('refresh failed', e)
-      setError(e.message)
+      setError(friendly.message)
     }
     setLoading(false)
   }, [user])
@@ -107,7 +130,7 @@ export function DataProvider({ children }) {
       persist(next); return { id, ...clean }
     }
     const { data: res, error } = await supabase.from('clients').insert({ ...clean, user_id: user.id }).select().single()
-    if (error) throw new Error(error.message)
+    if (error) throw toFriendlyError(error, 'addClient')
     await refresh()
     return res
   }
@@ -119,13 +142,13 @@ export function DataProvider({ children }) {
       persist(next); return
     }
     const { error } = await supabase.from('clients').update(clean).eq('id', id).eq('user_id', user.id)
-    if (error) throw new Error(error.message)
+    if (error) throw toFriendlyError(error, 'updateClient')
     await refresh()
   }
   const deleteClient = async (id) => {
     if (useLocalMode) { persist({ ...data, clients: data.clients.filter(c=>c.id!==id)}); return }
     const { error } = await supabase.from('clients').delete().eq('id', id).eq('user_id', user.id)
-    if (error) throw new Error(error.message)
+    if (error) throw toFriendlyError(error, 'deleteClient')
     await refresh()
   }
 
@@ -146,7 +169,7 @@ export function DataProvider({ children }) {
       return
     }
     const { error } = await supabase.from('income').insert({ ...payload, amount: Number(payload.amount), user_id:user.id })
-    if (error) throw new Error(error.message)
+    if (error) throw toFriendlyError(error, 'addIncome')
     await refresh()
     if (wasFirstEntry && !localStorage.getItem(`tracked_first_entry_${uid}`)) {
       track('first_entry_created', { type: 'income', amount: Number(payload.amount) })
@@ -157,13 +180,13 @@ export function DataProvider({ children }) {
     if (payload.amount != null && (isNaN(Number(payload.amount)) || Number(payload.amount) <= 0)) throw new Error('Amount must be positive')
     if (useLocalMode){ persist({...data, income: data.income.map(x=> x.id===id? {...x,...payload, amount: Number(payload.amount)}:x)}); return}
     const { error } = await supabase.from('income').update({...payload, amount: Number(payload.amount)}).eq('id',id).eq('user_id', user.id)
-    if (error) throw new Error(error.message)
+    if (error) throw toFriendlyError(error, 'updateIncome')
     await refresh()
   }
   const deleteIncome = async (id) => {
     if (useLocalMode){ persist({...data, income: data.income.filter(x=>x.id!==id)}); return}
     const { error } = await supabase.from('income').delete().eq('id',id).eq('user_id', user.id)
-    if (error) throw new Error(error.message)
+    if (error) throw toFriendlyError(error, 'deleteIncome')
     await refresh()
   }
 
@@ -181,7 +204,7 @@ export function DataProvider({ children }) {
       }
       return}
     const { error } = await supabase.from('expenses').insert({ ...payload, amount: Number(payload.amount), user_id:user.id })
-    if (error) throw new Error(error.message)
+    if (error) throw toFriendlyError(error, 'addExpense')
     await refresh()
     if (wasFirstEntry && !localStorage.getItem(`tracked_first_entry_${uid}`)) {
       track('first_entry_created', { type: 'expense', amount: Number(payload.amount) })
@@ -192,13 +215,13 @@ export function DataProvider({ children }) {
     if (payload.amount != null && (isNaN(Number(payload.amount)) || Number(payload.amount) <= 0)) throw new Error('Amount must be positive')
     if(useLocalMode){ persist({...data, expenses: data.expenses.map(x=> x.id===id? {...x,...payload, amount: Number(payload.amount)}:x)}); return}
     const { error } = await supabase.from('expenses').update({...payload, amount: payload.amount != null ? Number(payload.amount) : undefined}).eq('id',id).eq('user_id', user.id)
-    if (error) throw new Error(error.message)
+    if (error) throw toFriendlyError(error, 'updateExpense')
     await refresh()
   }
   const deleteExpense = async(id)=>{
     if(useLocalMode){ persist({...data, expenses:data.expenses.filter(x=>x.id!==id)}); return}
     const { error } = await supabase.from('expenses').delete().eq('id',id).eq('user_id', user.id)
-    if (error) throw new Error(error.message)
+    if (error) throw toFriendlyError(error, 'deleteExpense')
     await refresh()
   }
 
@@ -216,7 +239,13 @@ export function DataProvider({ children }) {
     const subtotal = Number(payload.subtotal ?? payload.total_amount)
     const tax_amount = Number((subtotal * tax_rate / 100).toFixed(2))
     const grand_total = Number((subtotal + tax_amount).toFixed(2))
-    const toSave = { ...payload, tax_type, tax_rate, subtotal, tax_amount, total_amount: grand_total, payments: payload.payments ?? [] }
+    // Revision Guard — contract term, 0-100 revisions, default 2
+    let revisions_included = Number(payload.revisions_included ?? data.settings.default_revisions_included ?? 2)
+    if (isNaN(revisions_included) || revisions_included < 0 || revisions_included > 100) throw new Error('Revisions included must be 0–100')
+    let revisions_used = Number(payload.revisions_used ?? 0)
+    if (isNaN(revisions_used) || revisions_used < 0 || revisions_used > 100) throw new Error('Revisions used must be 0–100')
+    if (revisions_used > revisions_included + 10) console.warn('Revisions used exceeds included — consider extra billing')
+    const toSave = { ...payload, tax_type, tax_rate, subtotal, tax_amount, total_amount: grand_total, payments: payload.payments ?? [], revisions_included: Math.floor(revisions_included), revisions_used: Math.floor(revisions_used) }
     const wasFirstInvoice = data.invoices.length === 0
     const uid = user?.id || 'anon'
     if(useLocalMode){
@@ -231,12 +260,13 @@ export function DataProvider({ children }) {
       return num
     }
     const num = `INV-${data.invoice_counter}`
-    // Resilient insert: try full payload, fallback without subtotal/tax_amount if schema not yet migrated
+    // Resilient insert: try full payload, fallback without subtotal/tax_amount/revisions if schema not yet migrated.
+    // Schema-cache errors are mapped to a friendly message (see src/utils/errors.js) but still logged.
     let insertError = null
     let { error } = await supabase.from('invoices').insert({ ...toSave, invoice_number:num, user_id:user.id })
-    if (error && (error.message.includes('subtotal') || error.message.includes('tax_amount') || error.message.includes('schema cache'))) {
-      console.warn('Retrying invoice insert without subtotal/tax_amount (run schema migration)', error.message)
-      const { subtotal: _s, tax_amount: _t, ...rest } = toSave
+    if (error && (error.message.includes('subtotal') || error.message.includes('tax_amount') || error.message.includes('revisions_') || error.message.includes('schema cache'))) {
+      console.warn('Retrying invoice insert without subtotal/tax_amount/revisions (run schema migration)', error.message)
+      const { subtotal: _s, tax_amount: _t, revisions_included: _ri, revisions_used: _ru, ...rest } = toSave
       const fallback = { ...rest, total_amount: grand_total, invoice_number:num, user_id:user.id }
       const retry = await supabase.from('invoices').insert(fallback)
       if (retry.error) insertError = retry.error
@@ -244,7 +274,7 @@ export function DataProvider({ children }) {
     } else {
       insertError = error
     }
-    if (insertError || error) throw new Error((insertError || error).message)
+    if (insertError || error) throw toFriendlyError(insertError || error, 'addInvoice')
     await refresh();
     if (wasFirstInvoice && !localStorage.getItem(`tracked_first_invoice_${uid}`)) {
       track('first_invoice_created', { total: grand_total, tax_rate })
@@ -259,16 +289,33 @@ export function DataProvider({ children }) {
     // Drop payments-related keys if the column doesn't exist yet (older DBs)
     const { error } = await supabase.from('invoices').update(clean).eq('id',id).eq('user_id', user.id)
     if (error) {
-      if (error.message.includes('payments') || error.message.includes('payment_date') || error.message.includes('sent_at') || error.message.includes('schema cache')) {
-        const { payments: _p, payment_date: _pd, sent_at: _s, ...rest } = clean
+      if (error.message.includes('payments') || error.message.includes('payment_date') || error.message.includes('sent_at') || error.message.includes('revisions_') || error.message.includes('schema cache')) {
+        const { payments: _p, payment_date: _pd, sent_at: _s, revisions_included: _ri, revisions_used: _ru, ...rest } = clean
         const retry = await supabase.from('invoices').update(rest).eq('id',id).eq('user_id', user.id)
-        if (retry.error) throw new Error(retry.error.message)
+        if (retry.error) throw toFriendlyError(retry.error, 'updateInvoice')
         await refresh()
         return
       }
-      throw new Error(error.message)
+      throw toFriendlyError(error, 'updateInvoice')
     }
     await refresh()
+  }
+
+  const updateRevisions = async (id, { revisions_used, revisions_included })=>{
+    const inv = data.invoices.find(x=> x.id===id)
+    if (!inv) throw new Error('Invoice not found')
+    const payload = {}
+    if (revisions_used != null){
+      const v = Number(revisions_used)
+      if (isNaN(v) || v <0 || v >100) throw new Error('Revisions used must be 0–100')
+      payload.revisions_used = Math.floor(v)
+    }
+    if (revisions_included != null){
+      const v = Number(revisions_included)
+      if (isNaN(v) || v <0 || v>100) throw new Error('Revisions included must be 0–100')
+      payload.revisions_included = Math.floor(v)
+    }
+    await updateInvoice(id, payload)
   }
 
   const normalizeInvoice = (inv) => ({
@@ -310,7 +357,7 @@ export function DataProvider({ children }) {
   const deleteInvoice = async(id)=>{
     if(useLocalMode){ persist({...data, invoices:data.invoices.filter(x=>x.id!==id)}); return}
     const { error } = await supabase.from('invoices').delete().eq('id',id).eq('user_id', user.id)
-    if (error) throw new Error(error.message)
+    if (error) throw toFriendlyError(error, 'deleteInvoice')
     await refresh()
   }
 
@@ -320,7 +367,7 @@ export function DataProvider({ children }) {
     localStorage.setItem('clearbooks_settings', JSON.stringify(next.settings))
   }
 
-  return <DataContext.Provider value={{ data, loading, error, refresh, addClient, updateClient, deleteClient, addIncome, updateIncome, deleteIncome, addExpense, updateExpense, deleteExpense, addInvoice, updateInvoice, deleteInvoice, recordPayment, markPaid, markSent, normalizeInvoice, updateSettings }}>
+  return <DataContext.Provider value={{ data, loading, error, refresh, addClient, updateClient, deleteClient, addIncome, updateIncome, deleteIncome, addExpense, updateExpense, deleteExpense, addInvoice, updateInvoice, deleteInvoice, recordPayment, markPaid, markSent, updateRevisions, normalizeInvoice, updateSettings }}>
     {children}
   </DataContext.Provider>
 }
